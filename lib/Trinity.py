@@ -14,22 +14,28 @@ class Trinity:
         self.CPU = 1
         self.InputFile = InputFile
         self.OutputFile = OutputFile
+        self.MinLength = 200
 
     def launch(self,message):
         ExitCode = 0
-        command = ["Trinity","--seqType",self.seqType,"--single", self.InputFile,
-                   "--output",self.OutputFile,
+        command = ["Trinity","--seqType", self.seqType,"--single", self.InputFile,
+                   "--output", self.OutputFile,
                    "--CPU", str(self.CPU), "--max_memory", str(self.max_memory)+"G"]
         if message == "full_cleanup":
             command.append("--full_cleanup")
+            
+        if self.MinLength != 200:
+            command.extend(["--min_contig_length",str(self.MinLength)])
+            
         try:
             ExitCode = subprocess.call(command)
         except:
             os.system("echo Unexpected error when we launch Trinity:\n")
             print " ".join(command)
+            
         return ExitCode
     
-    ###############################################################################
+###############################################################################
 #
 #     ______  ____   ____  ____   ____  ______  __ __
 #    |      ||    \ |    ||    \ |    ||      ||  |  |
