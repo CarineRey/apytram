@@ -5,7 +5,6 @@ import subprocess
 
 ## TO DO: check if blast+ is installed and is path is blast*
 
-
 class Makeblastdb:
     """Define an object to create a local database"""
     def __init__(self, InputFile, OutputFiles):
@@ -118,11 +117,11 @@ class Blast:
     def launch(self,OutputFile):
         ExitCode = 1
         if self.Program in ["blastn","blastx","tblastn","tblastx"]:
-            command = [self.Program,"-db", self.Database, "-query" , os.path.abspath(self.QueryFile),
+            command = [self.Program,"-db", self.Database, "-query" , self.QueryFile,
                       "-evalue", str(self.Evalue), "-outfmt", str(self.OutFormat),
-                      "-out", os.path.abspath(OutputFile), "-perc_identity" , str(self.perc_identity),
+                      "-out", OutputFile, "-perc_identity" , str(self.perc_identity),
                       "-max_target_seqs", str(self.max_target_seqs),
-                      "-num_threads", str(self.Threads)] #, "-v", str(self.v), "-b", str(self.b) ]
+                      "-num_threads", str(self.Threads)]
             print " ".join(command)
             try:
                  ExitCode = subprocess.call(command)
@@ -135,14 +134,10 @@ class Blast:
                 return ExitCode
     
     def get_hit_names(self,OutputFile):
-        command = [self.Program,"-db", self.Database, "-query" , os.path.abspath(self.QueryFile),
+        command = [self.Program,"-db", self.Database, "-query" , self.QueryFile,
                   "-evalue", str(self.Evalue), "-m", str(self.OutFormat),
                   "-a", str(self.Threads)] #, "-v", str(self.v), "-b", str(self.b) ]
         try:
-            #TO DO recuperer dans des fichier ouvert open wb balise et balise Err les sorties standards
-#balise=open('./OUT.txt', 'wb')
-#baliseErr=open('./ERR.txt', 'wb')
-#result = subprocess.call(command, stdout=balise,stderr=baliseErr)
             result = subprocess.check_output(command)
         except:
             os.system("echo Unexpected error when we launch blastall with :\n")
