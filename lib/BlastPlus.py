@@ -19,7 +19,7 @@ class Makeblastdb:
         ExitCode = 1
         command = ["makeblastdb","-in",self.InputFile,"-out", self.OutputFiles,
                    "-dbtype", self.Dbtype ]
-        print " ".join(command)
+
         if self.IndexedDatabase:
             command.append("-parse_seqids")
         subprocess.call(command)
@@ -122,7 +122,7 @@ class Blast:
                       "-out", OutputFile, "-perc_identity" , str(self.perc_identity),
                       "-max_target_seqs", str(self.max_target_seqs),
                       "-num_threads", str(self.Threads)]
-            print " ".join(command)
+
             try:
                  ExitCode = subprocess.call(command)
             except:
@@ -449,7 +449,6 @@ class Blastdbcmd:
     def launch(self):
         command = ["blastdbcmd","-db",self.Database,"-entry_batch", self.InputFile,
                    "-dbtype", self.Dbtype, "-out" , self.OutputFile ]
-        print " ".join(command)
         
         try:
             subprocess.call(command)
