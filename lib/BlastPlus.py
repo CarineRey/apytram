@@ -456,6 +456,16 @@ class Blastdbcmd:
             os.system("echo Unexpected error when we launched blastdbcmd:\n")
             print " ".join(command)
         return command
+    def is_database(self):
+        Out = False
+        command = ["blastdbcmd","-db",self.Database,"-info"]
+        ExitCode = subprocess.call(command)
+        # If no error the database exist
+        if not ExitCode:
+            Out = True             
+        return Out
+        
+        
 #USAGE
 #  blastdbcmd [-h] [-help] [-db dbname] [-dbtype molecule_type]
 #    [-entry sequence_identifier] [-entry_batch input_file] [-pig PIG] [-info]

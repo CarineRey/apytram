@@ -1,9 +1,9 @@
-
+#!/usr/bin/python
 # coding: utf-8
 
 # In[ ]:
 
-#!/usr/bin/python
+
 import os
 import sys
 import time

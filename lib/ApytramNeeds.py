@@ -134,11 +134,11 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     return 0
 def write_stats(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
-    df.to_csv('%s.stats.csv')
+    df.to_csv("%s.stats.csv" % OutPreffixName)
 
 def create_plot(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
-    with PdfPages('%s.stats.pdf' % OutPreffixName) as pdf:
+    with PdfPages("%s.stats.pdf" % OutPreffixName) as pdf:
         df.plot(subplots=True, figsize=(10, 20), style = ["-o","-o","-o","-o","-o"])
         plt.legend(loc='best')
         pdf.savefig()
@@ -187,7 +187,7 @@ def calculate_coverage(Alignment, output_file = None):
 
     # Coverage count
     length_reference = len(dic[ref_name])
-    # Counters initilisation
+    # Counters initilisationwrite_stats
     cov = [0]*length_reference
     cov_ext = [0]*length_reference
     cov_ref = [0]*length_reference
