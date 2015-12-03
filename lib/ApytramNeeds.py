@@ -4,6 +4,9 @@ import numpy as np
 import sys
 import subprocess
 import pandas
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+#matplotlib.style.use('ggplot')
 
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
@@ -19,6 +22,14 @@ def add_paired_read_names(File):
         os.system(command1)
         os.system(command2)
     return 0
+
+def are_identical(File1,File2):
+    Identical = False
+    if os.path.isfile(File1) and  os.path.isfile(File2):
+        diff = subprocess.call(["diff",File1,File2])
+        if not diff:
+            Identical = True
+    return Identical
 
 def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
     "Return Query names if the identity percentage is superior to MinIdentityPercentage"
@@ -44,8 +55,24 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
 
     return Names, BestScoreNames, ExonerateResultsDict
 
+def check_almost_identical_exonerate_results(ExonerateResult):
+    "Return True if all hit have a hit with 99% > id and a len = 98% len query "
+    Result = False
+    i = 0
+    List = ExonerateResult.strip().split("\n")
+    for line in List:
+        ListLine = line.split("\t")
+        #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
+        pi = float(ListLine[6])
+        ql = float(ListLine[2])
+        tl = float(ListLine[5])
+        pl = min( ql, tl) / max( ql, tl)
+        if (pl >= 0.99) and (pi > 98) :
+            i += 1
 
-
+    if len(List) == i:
+        Result = True
+    return Result 
         
 def filter_fasta(FastaFile, Names, OutFastaFile):
     "Return a fasta file with only sequence in Names"
@@ -72,7 +99,7 @@ def filter_fasta(FastaFile, Names, OutFastaFile):
     OutFile.close()        
     return 0
 
-def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header = None, Names = None):
+def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header = None, Names = None, Message = ""):
     "Return a fasta file with new names depending on the ExonerateResultsDict"
     df = pandas.DataFrame(ExonerateResultsDict, index = Header)
     File = open(FastaFile,"r")
@@ -82,18 +109,18 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     sequence = ""
     string = ""
     i = 1
+
     for line in Fasta:
         if re.match(">",line):
             name = line.split()[0].replace(">","")
-            print name
             if (Names):
                 if name in Names:
-                    string += ">APYTRAM_%d[%s]\n" %(i,df[name]["ti"])
+                    string += ">APYTRAM_%s%d[%s]\n" %(Message,i,df[name]["ti"])
                     i+=1
                 else:
                     name = ""
             else:
-                string += ">APYTRAM_%d[%s]\n" %(i,df[name]["ti"])
+                string += ">APYTRAM_%s%d[%s]\n" %(Message,i,df[name]["ti"])
                 i+=1
             
         elif name != "":
@@ -105,7 +132,18 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     OutFile.write(string)
     OutFile.close()  
     return 0
+def write_stats(StatsDict,OutPreffixName):
+    df = pandas.DataFrame(StatsDict).T
+    df.to_csv('%s.stats.csv')
 
+def create_plot(StatsDict,OutPreffixName):
+    df = pandas.DataFrame(StatsDict).T
+    with PdfPages('%s.stats.pdf' % OutPreffixName) as pdf:
+        df.plot(subplots=True, figsize=(10, 20), style = ["-o","-o","-o","-o","-o"])
+        plt.legend(loc='best')
+        pdf.savefig()
+        plt.close()
+    
 def calculate_coverage(Alignment, output_file = None):
     # The first sequence must be the reference
     #Alignment reading

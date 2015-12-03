@@ -5,7 +5,6 @@ import subprocess
 
 ## TO DO: check if Trinity is installed and is path is Trinity v2.2>=
 
-
 class Trinity:
     """Define an object to launch Trinity"""
     def __init__(self, InputFile, OutputFile):
@@ -15,17 +14,23 @@ class Trinity:
         self.InputFile = InputFile
         self.OutputFile = OutputFile
         self.MinLength = 200
+        self.Paired = False
+        self.FullCleanup = False
 
-    def launch(self,message):
+    def launch(self):
         ExitCode = 0
         command = ["Trinity","--seqType", self.seqType,"--single", self.InputFile,
                    "--output", self.OutputFile,
                    "--CPU", str(self.CPU), "--max_memory", str(self.max_memory)+"G"]
-        if message == "full_cleanup":
+       
+        if self.FullCleanup:
             command.append("--full_cleanup")
             
         if self.MinLength != 200:
             command.extend(["--min_contig_length",str(self.MinLength)])
+        
+        if self.Paired:
+            command.append("--run_as_paired")
             
         try:
             ExitCode = subprocess.call(command)
