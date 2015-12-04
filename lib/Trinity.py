@@ -16,10 +16,11 @@ class Trinity:
         self.MinLength = 200
         self.Paired = False
         self.FullCleanup = False
+        self.NoPathMerging = False
 
     def launch(self):
         ExitCode = 0
-        command = ["Trinity","--seqType", self.seqType,"--single", self.InputFile,
+        command = ["Trinity","--no_version_check","--seqType", self.seqType,"--single", self.InputFile,
                    "--output", self.OutputFile,
                    "--CPU", str(self.CPU), "--max_memory", str(self.max_memory)+"G"]
        
@@ -31,9 +32,14 @@ class Trinity:
         
         if self.Paired:
             command.append("--run_as_paired")
+        
+        if self.NoPathMerging:
+            command.append("--no_path_merging")
             
         try:
-            ExitCode = subprocess.call(command)
+            ExitCode = subprocess.call(command,
+                                       stdout=open("/dev/null", "w"),
+                                       stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error when we launch Trinity:\n")
             print " ".join(command)

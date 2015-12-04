@@ -26,34 +26,61 @@ def add_paired_read_names(File):
 def are_identical(File1,File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):
-        diff = subprocess.call(["diff",File1,File2])
+        diff = subprocess.call(["diff",File1,File2,"--brief"],
+                                       stdout=open("/dev/null", "w"),
+                                       stderr=open("/dev/null", "w"))
         if not diff:
             Identical = True
     return Identical
 
 def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
     "Return Query names if the identity percentage is superior to MinIdentityPercentage"
-    Names = []
-    BestScore = 0
+        
+    IterStats = {"AverageLength": 0,
+                 "TotalLength": 0,
+                 "BestLength":0,
+                 "AverageScore": 0,
+                 "TotalScore": 0,
+                 "BestScore":0,
+                 "AverageIdentity": 0,
+                 "TotalIdentity": 0,
+                 "BestIdentity":0,
+                }
+        
     BestScoreNames = []
     ExonerateResultsDict = {}
     List = ExonerateResult.strip().split("\n")
+    
     for line in List:
         ListLine = line.split("\t")
         #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\n"
         ti = ListLine[1]
         pi = float(ListLine[8])
         score = float(ListLine[7])
-        ExonerateResultsDict[ti] = ListLine
+        tl = float(ListLine[4])
         if pi >=  MinIdentityPercentage:
             # We keep this sequence
-            if ti not in Names:
-                Names.append(ti)
-            if BestScore <= score:
-                BestScore = score
-                BestScoreNames.append(ti)
+            ExonerateResultsDict[ti] = ListLine
 
-    return Names, BestScoreNames, ExonerateResultsDict
+            IterStats["TotalIdentity"] += pi
+            if IterStats["BestIdentity"] <= pi:
+                IterStats["BestIdentity"] = pi
+            
+            IterStats["TotalLength"] += tl
+            if IterStats["BestLength"] <= tl:
+                IterStats["BestLength"] = tl
+            
+            IterStats["TotalScore"] += score
+            if IterStats["BestScore"] <= score:
+                IterStats["BestScore"] = score
+                BestScoreNames.append(ti)        
+    
+    NbContigs = len(ExonerateResultsDict.keys())
+    IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
+    IterStats["AverageLength"] = IterStats["TotalLength"] / NbContigs
+    IterStats["AverageScore"] = IterStats["TotalScore"] / NbContigs
+    
+    return BestScoreNames, ExonerateResultsDict, IterStats
 
 def check_almost_identical_exonerate_results(ExonerateResult):
     "Return True if all hit have a hit with 99% > id and a len = 98% len query "
@@ -62,7 +89,7 @@ def check_almost_identical_exonerate_results(ExonerateResult):
     List = ExonerateResult.strip().split("\n")
     for line in List:
         ListLine = line.split("\t")
-        #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
+        #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\t\n"
         pi = float(ListLine[6])
         ql = float(ListLine[2])
         tl = float(ListLine[5])
@@ -139,12 +166,13 @@ def write_stats(StatsDict,OutPreffixName):
 def create_plot(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
     with PdfPages("%s.stats.pdf" % OutPreffixName) as pdf:
-        df.plot(subplots=True, figsize=(10, 20), style = ["-o","-o","-o","-o","-o"])
-        plt.legend(loc='best')
+        df.plot(subplots=True, grid = True,
+                legend = "best",
+                figsize=(10, 30), style = "-o")
         pdf.savefig()
         plt.close()
     
-def calculate_coverage(Alignment, output_file = None):
+def calculate_coverage(Alignment):
     # The first sequence must be the reference
     #Alignment reading
     Alignment= Alignment.split("\n")
@@ -188,8 +216,6 @@ def calculate_coverage(Alignment, output_file = None):
     # Coverage count
     length_reference = len(dic[ref_name])
     # Counters initilisationwrite_stats
-    cov = [0]*length_reference
-    cov_ext = [0]*length_reference
     cov_ref = [0]*length_reference
     cov_ref_ext = [0]*length_reference
     ref = [0]*length_reference
@@ -203,26 +229,17 @@ def calculate_coverage(Alignment, output_file = None):
             sequence = dic[contig]
             for i in range(0,length_reference):
                 if sequence[i]!='-':
-                    cov_ext[i] +=1
                     cov_ref_ext[i] =1
                     if ref_sequence[i] != "-":
-                        cov[i] += 1
                         cov_ref[i] = 1
-                    else:
-                        cov[i]-=1
-
 
     # We count the number of base position in the alignment
     sum_cov_ref_ext = 0
     sum_cov_ref = 0
-    sum_cov = 0
-    sum_cov_ext = 0
     sum_ref = 0
     for i in range(0,length_reference):
         sum_cov_ref_ext += cov_ref_ext[i]
         sum_cov_ref += cov_ref[i]
-        sum_cov += abs(cov[i])
-        sum_cov_ext += abs(cov_ext[i])
         sum_ref += ref[i]
 
     #Percentage of positon of the reference which is reprensented in contigs
@@ -231,13 +248,4 @@ def calculate_coverage(Alignment, output_file = None):
     #It can be superior to 100 if the contigs are longer than the reference
     p_cov_ext=float(sum_cov_ref_ext)/float(sum_ref) *100
 
-    # Write all counter in a file
-    if output_file:
-        output_string = "\t".join(["Pos","Ref","ref","cov_ref","cov_ref_ext","cov","cov_ext"])+"\n"
-        for i in range(0,length_reference):
-            output_string += "\t".join([str(i) for i in [i,ref_sequence[i],ref[i],cov_ref[i],cov_ref_ext[i],cov[i],cov_ext[i]]])+"\n"
-        output = open(output_file,"w")
-        output.write(output_string)
-        output.close()
-        
     return p_cov, p_cov_ext

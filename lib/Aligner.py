@@ -33,7 +33,8 @@ class Exonerate:
             command.extend(["--model",str(self.Model)])
 
         try:
-            Out = subprocess.check_output(command)
+            Out = subprocess.check_output(command,
+                                         stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error when we launch Exonerate:\n")
             print " ".join(command)
@@ -70,7 +71,8 @@ class Mafft:
         
         command.append(self.InputFile)
         try:
-            Out = subprocess.check_output(command)
+            Out = subprocess.check_output(command,
+                                          stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error when we launch Mafft:\n")
             print " ".join(command)

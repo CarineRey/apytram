@@ -112,19 +112,27 @@ class Blast:
         self.OutFormat = 8
         self.Evalue = 10
         self.max_target_seqs = 1000000000
-        self.perc_identity = 20
+        self.perc_identity = 0
+        self.Task = ""
    
     def launch(self,OutputFile):
         ExitCode = 1
         if self.Program in ["blastn","blastx","tblastn","tblastx"]:
             command = [self.Program,"-db", self.Database, "-query" , self.QueryFile,
                       "-evalue", str(self.Evalue), "-outfmt", str(self.OutFormat),
-                      "-out", OutputFile, "-perc_identity" , str(self.perc_identity),
+                      "-out", OutputFile,
                       "-max_target_seqs", str(self.max_target_seqs),
                       "-num_threads", str(self.Threads)]
+            
+            if self.perc_identity:
+                command.extend(["-perc_identity" , str(self.perc_identity)])
+            if self.Task:
+                command.extend(["-task",self.Task])
 
             try:
-                 ExitCode = subprocess.call(command)
+                 ExitCode = subprocess.call(command,
+                                       stdout=open("/dev/null", "w"),
+                                       stderr=open("/dev/null", "w"))
             except:
                 os.system("echo Unexpected error\n")
                 print " ".join(command)
@@ -133,29 +141,6 @@ class Blast:
                 print "%s not in [blastn,blastx,tblastn,tblastx]" % self.Program
                 return ExitCode
     
-    def get_hit_names(self,OutputFile):
-        command = [self.Program,"-db", self.Database, "-query" , self.QueryFile,
-                  "-evalue", str(self.Evalue), "-m", str(self.OutFormat),
-                  "-a", str(self.Threads)] #, "-v", str(self.v), "-b", str(self.b) ]
-        try:
-            result = subprocess.check_output(command)
-        except:
-            os.system("echo Unexpected error when we launch blastall with :\n")
-            result = ""
-            print " ".join(command)
-        
-        #Get hit names:
-        Names = [x.split("\t")[1] for x in result.strip().split("\n")]
-        #Write Names in the outputfile
-        try:
-            Output = open(OutputFile,"w")
-            Output.write("\n".join(Names))
-            Output.close()
-        except:
-            os.system("echo Unexpected error when we tried to write in %s\n" % OutpuFile)
-        
-        return Names
-
 #USAGE
 #  blastn [-h] [-help] [-import_search_strategy filename]
 #    [-export_search_strategy filename] [-task task_name] [-db database_name]
@@ -451,15 +436,21 @@ class Blastdbcmd:
                    "-dbtype", self.Dbtype, "-out" , self.OutputFile ]
         
         try:
-            subprocess.call(command)
+            subprocess.call(command,
+                            stdout=open("/dev/null", "w"),
+                            stderr=open("/dev/null", "w"))
+            
         except:
             os.system("echo Unexpected error when we launched blastdbcmd:\n")
             print " ".join(command)
         return command
+    
     def is_database(self):
         Out = False
         command = ["blastdbcmd","-db",self.Database,"-info"]
-        ExitCode = subprocess.call(command)
+        ExitCode = subprocess.call(command,
+                                   stdout=open("/dev/null", "w"),
+                                   stderr=open("/dev/null", "w"))
         # If no error the database exist
         if not ExitCode:
             Out = True             
