@@ -99,6 +99,12 @@ else:
 if args.plot:
     args.stats = True
 
+### Set up the output directory
+if args.log:
+    LogDirName = os.path.dirname(args.log)
+    if not os.path.isdir(LogDirName) and LogDirName:
+        os.makedirs(LogDirName)
+
 ### Set up the logger
 LogFile = args.log
 # create logger with 'spam_application'
@@ -383,6 +389,8 @@ while (i < MaxIteration) and (Stop == False):
             # Stop iteration if the Largecoverage is not improved and also the Total length
             
             if StatsDict["iter_%d" %(i)]["TotalLength"] > StatsDict["iter_%d" %(i-1)]["TotalLength"]:
+                pass
+            elif StatsDict["iter_%d" %(i)]["TotalScore"] > StatsDict["iter_%d" %(i-1)]["TotalScore"]:
                 pass
             elif StatsDict["iter_%d" %(i)]["LargeCoverage"] <= StatsDict["iter_%d" %(i-1)]["LargeCoverage"]:
                 logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
