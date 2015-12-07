@@ -4,6 +4,8 @@ import numpy as np
 import sys
 import subprocess
 import pandas
+import matplotlib
+matplotlib.use("PDF")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 #matplotlib.style.use('ggplot')
@@ -159,19 +161,42 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     OutFile.write(string)
     OutFile.close()  
     return 0
+
 def write_stats(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
     df.to_csv("%s.stats.csv" % OutPreffixName)
 
 def create_plot(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
+    # Categorize columns
+    TimeColumns = []
+    OtherColumns = []
+    for col in df.columns:
+        if "Time" in col and col not in ["CumulTime","IterationTime"]:
+            TimeColumns.append(col)
+        else:
+            OtherColumns.append(col)
+        
     with PdfPages("%s.stats.pdf" % OutPreffixName) as pdf:
-        df.plot(subplots=True, grid = True,
-                legend = "best",
-                figsize=(10, 30), style = "-o")
+        df[OtherColumns].plot(subplots=True,
+                              grid = True,
+                              legend = "best",
+                              figsize=(10, 20),
+                              style = "-o")
         pdf.savefig()
         plt.close()
-    
+        
+        df[TimeColumns].plot(kind='bar',
+                             grid = True,
+                             figsize=(10, 10),
+                             stacked=True,
+                             legend = "best")
+        plt.ylabel('seconds')
+        plt.xlabel('Iterations')
+        plt.title('Distribution of the execution time')
+        pdf.savefig()
+        plt.close()
+
 def calculate_coverage(Alignment):
     # The first sequence must be the reference
     #Alignment reading
