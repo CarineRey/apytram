@@ -163,6 +163,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
             else:
                 # Format the fastq file in fasta
                 InputFasta = TmpDirName + "/" + os.path.basename(args.fastq) + ".fasta"
+                logger.info("Convert the fastq file in fasta format")
                 ExitCode = ApytramNeeds.fastq2fasta(args.fastq,InputFasta)
         elif args.fasta:
             InputFasta = args.fasta
