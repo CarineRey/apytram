@@ -47,7 +47,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
                  "BestIdentity":0,
                 }
         
-    BestScoreNames = []
+    BestScoreNames = [""]
     ExonerateResultsDict = {}
     List = ExonerateResult.strip().split("\n")
     
@@ -73,7 +73,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
             IterStats["TotalScore"] += score
             if IterStats["BestScore"] <= score:
                 IterStats["BestScore"] = score
-                BestScoreNames.append(ti)        
+                BestScoreNames[0] = ti
     
     NbContigs = len(ExonerateResultsDict.keys())
     IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
