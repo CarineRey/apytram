@@ -17,7 +17,7 @@ class Makeblastdb:
 
     def launch(self):
         ExitCode = 1
-        command = ["makeblastdb","-in",self.InputFile,"-out", self.OutputFiles,
+        command = ["makeblastdb","-in",self.InputFile,"-out", os.path.abspath(self.OutputFiles),
                    "-dbtype", self.Dbtype ]
 
         if self.IndexedDatabase:
