@@ -22,62 +22,65 @@ parser = argparse.ArgumentParser(prog = "apytram.py",
     Run apytram.py on a fastq file to retrieve
     homologous sequences of bait sequences.''')
 
-requiredOptions = parser.add_argument_group('required arguments')
+requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
                              help='Database preffix name', required=True)
 requiredOptions.add_argument('-t', '--database_type', type=str, choices=["single","paired"],
                              help='single or paired end database', required=True)
 
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-parser.add_argument('-log', nargs='?', type=str, default="apytram.log",
-                   help = "a log file to report avancement (default: apytram.log)"
-                   )
-parser.add_argument('--threads',  type=int,
-                    help = "Available threads. (Default 1)",
-                    default = 1 )
 
 
 
-parser.add_argument('-fa', '--fasta',  type=str,
+
+
+InOutOptions = parser.add_argument_group('Input and Output Files')
+
+InOutOptions.add_argument('-fa', '--fasta',  type=str,
                    help = "Fasta formatted RNA-seq data to build the database of reads")
-parser.add_argument('-fq', '--fastq',  type=str,
+InOutOptions.add_argument('-fq', '--fastq',  type=str,
                    help = "Fastq formatted RNA-seq data to build the database of reads")
-parser.add_argument('-out', '--output_preffix',  type=str, default = "./apytram",
+InOutOptions.add_argument('-q', '--query',  type=str,
+                    help = "Fasta file (nt) with bait sequence for the apytram run." )
+InOutOptions.add_argument('-out', '--output_preffix',  type=str, default = "./apytram",
                    help = "Output preffix (Default ./apytram)")
-
-parser.add_argument('-tmp',  type=str,
+InOutOptions.add_argument('-tmp',  type=str,
                     help = "Directory to stock all intermediary files for the apytram run. (default: a directory in /tmp which will be removed at the end)",
                     default = "" )
-parser.add_argument('--keep_iterations',  action='store_true',
-                    help = "A fasta file will be created at each iteration."
+InOutOptions.add_argument('--keep_iterations',  action='store_true',
+                    help = "A fasta file will be created at each iteration.")
+InOutOptions.add_argument('--stats', action='store_true',
+                             help='Create files with statistics on each iteration')
+InOutOptions.add_argument('--plot', action='store_true',
+                             help='Create file with plot on statistics on each iteration')
+InOutOptions.add_argument('-log', nargs='?', type=str, default="apytram.log",
+                   help = "a log file to report avancement (default: apytram.log)"
                    )
 
-parser.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nt) with bait sequence for the apytram run." )
-parser.add_argument('-i', '--iteration_max',  type=int,
+
+SearchOptions = parser.add_argument_group('Arguments for search thresholds')
+
+SearchOptions.add_argument('-i', '--iteration_max',  type=int,
                     help = "Maximum number of iteration. (Default 5)",
                     default = 5 )
-parser.add_argument('-e', '--evalue',  type=float,
+SearchOptions.add_argument('-e', '--evalue',  type=float,
                     help = "Evalue. (Default 1e-3)",
                     default = 1e-3 )
-parser.add_argument('--required_coverage',  type=float,
+SearchOptions.add_argument('--required_coverage',  type=float,
                     help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
                     default = 200 )
 
-parser.add_argument('-id', '--min_id',  type=int,
+SearchOptions.add_argument('-id', '--min_id',  type=int,
                     help = "Minimum identity percentage with a query to keep a sequence  (Default 50)",
                     default = 50 )
-parser.add_argument('-l', '--min_len',  type=int,
+SearchOptions.add_argument('-l', '--min_len',  type=int,
                     help = "Minimum length to keep a sequence  (Default 200)",
                     default = 200 )
 
-StatOptions = parser.add_argument_group('Arguments for statistics and plots')
-StatOptions.add_argument('--stats', action='store_true',
-                             help='Create files with statistics on each iteration')
-StatOptions.add_argument('--plot', action='store_true',
-                             help='Create file with plot on statistics on each iteration')
-
-
+MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
+MiscellaneousOptions.add_argument('--threads',  type=int,
+                    help = "Available threads. (Default 1)",
+                    default = 1 )
 
 ### Option parsing
 args = parser.parse_args()
