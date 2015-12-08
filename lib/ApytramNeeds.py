@@ -25,6 +25,16 @@ def add_paired_read_names(File):
         os.system(command2)
     return 0
 
+def remove_duplicated_read_names(File):
+    "remove duplicated read names"
+    if os.path.isfile(File):
+        command1 = """sort -u %s > %s""" %(File, File+".uniq")
+        command2 = "mv %s %s" %(File+".uniq", File)
+        os.system(command1)
+        os.system(command2)
+    return 0
+
+
 def are_identical(File1,File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):
