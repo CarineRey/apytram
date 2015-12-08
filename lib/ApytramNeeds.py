@@ -74,7 +74,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
         ql = float(ListLine[2])
         if pi >=  MinIdentityPercentage:
             # We keep this sequence
-            ExonerateResultsDict[ti] = ListLine
+            ExonerateResultsDict[qi] = ListLine
 
             IterStats["TotalIdentity"] += pi
             if IterStats["BestIdentity"] <= pi:
