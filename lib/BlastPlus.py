@@ -24,7 +24,9 @@ class Makeblastdb:
             command.append("-parse_seqids")
         subprocess.call(command)
         try:
-            ExitCode = subprocess.call(command)
+            ExitCode = subprocess.call(command,
+                                       stdout=open("/dev/null", "w"),
+                                       stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error: "+" ".join(command)+"\n")
         return ExitCode
