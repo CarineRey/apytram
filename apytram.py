@@ -488,7 +488,7 @@ if i: #We check that there is at least one iteration with a result
                                                  OutPreffixName+".best.fasta", 
                                                  Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                  Names = BestScoreNames.values(),
-                                                 Message = ".best." %i)
+                                                 Message = ".best.")
     # Last iteration
     ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                  TrinityExonerateResultsDict,
