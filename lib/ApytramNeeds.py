@@ -59,17 +59,19 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
                  "BestIdentity":0,
                 }
         
-    BestScoreNames = [""]
+    BestScoreNames = {}
     ExonerateResultsDict = {}
     List = ExonerateResult.strip().split("\n")
     
     for line in List:
         ListLine = line.split("\t")
-        #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\n"
-        ti = ListLine[1]
+        #TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+        ti = ListLine[0]
+        qi = ListLine[1]
         pi = float(ListLine[8])
         score = float(ListLine[7])
         tl = float(ListLine[4])
+        ql = float(ListLine[2])
         if pi >=  MinIdentityPercentage:
             # We keep this sequence
             ExonerateResultsDict[ti] = ListLine
@@ -78,14 +80,14 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
             if IterStats["BestIdentity"] <= pi:
                 IterStats["BestIdentity"] = pi
             
-            IterStats["TotalLength"] += tl
-            if IterStats["BestLength"] <= tl:
-                IterStats["BestLength"] = tl
+            IterStats["TotalLength"] += ql
+            if IterStats["BestLength"] <= ql:
+                IterStats["BestLength"] = ql
             
             IterStats["TotalScore"] += score
             if IterStats["BestScore"] <= score:
                 IterStats["BestScore"] = score
-                BestScoreNames[0] = ti
+                BestScoreNames[ti] = qi
     
     NbContigs = len(ExonerateResultsDict.keys())
     IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
