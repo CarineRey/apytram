@@ -22,15 +22,16 @@ class Exonerate:
         command = ["exonerate","-t", self.TargetFile,"-q", self.QueryFile,
                    "--showalignment", self.ShowAlignment,
                    "--showvulgar", self.ShowVulgar]
-
+        
+        if self.Model:
+            command.extend(["--model",str(self.Model)])
         if self.Bestn > 0:
             command.extend(["--bestn",str(self.Bestn)])
         if self.Identity > 0:
             command.extend(["--percent",str(self.Identity)])
         if self.Ryo:
             command.extend(["--ryo",str(self.Ryo)])
-        if self.Model:
-            command.extend(["--model",str(self.Model)])
+
 
         try:
             Out = subprocess.check_output(command,
@@ -39,9 +40,13 @@ class Exonerate:
             os.system("echo Unexpected error when we launch Exonerate:\n")
             print " ".join(command)
 
-        # Remove Exonerate default lines (First, second and last):
+        # Remove Exonerate default lines (First, second (which contains Hostname) and last):
         List = Out.strip().split("\n")
-        Out = "\n".join(List[3:-1])
+        Start = 0
+        while not "Hostname" in List[Start]:
+            Start += 1
+            
+        Out = "\n".join(List[Start+1:-1])
         
         return Out
 
