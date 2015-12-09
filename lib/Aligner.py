@@ -16,6 +16,7 @@ class Exonerate:
         self.ShowVulgar = "F"
         self.Bestn = 0
         self.Identity = 0
+        self.Exhaustive = False
 
     def get_output(self):
         Out = "Command line: []\nHostname:\n-- completed exonerate analysis"
@@ -31,7 +32,8 @@ class Exonerate:
             command.extend(["--percent",str(self.Identity)])
         if self.Ryo:
             command.extend(["--ryo",str(self.Ryo)])
-
+        if self.Exhaustive:
+            command.extend(["--exhaustive","T"])
 
         try:
             Out = subprocess.check_output(command,
