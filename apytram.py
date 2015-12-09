@@ -54,6 +54,8 @@ InOutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration')
 InOutOptions.add_argument('--plot', action='store_true',
                              help='Create file with plot on statistics on each iteration')
+InOutOptions.add_argument('--plot_ali', action='store_true',
+                             help='Create file with a plot representing the alignement of all last iteration sequences on the query. Take some seconds. (default: False)')
 InOutOptions.add_argument('-log', type=str, default="apytram.log",
                    help = "a log file to report avancement (default: apytram.log)")
 
@@ -63,7 +65,7 @@ SearchOptions = parser.add_argument_group('Arguments for search thresholds')
 SearchOptions.add_argument('-i', '--iteration_max',  type=int,
                     help = "Maximum number of iteration. (Default 5)",
                     default = 5 )
-InOutOptions.add_argument('--finish_all_iter',  action='store_true',
+InOutOptions.add_argument('--finish_all_iter', action='store_true',
                     default = False,
                     help = "apytram will finish all iteration (-i) even if there is no improvment) (default: False)")
 SearchOptions.add_argument('-e', '--evalue',  type=float,
@@ -73,9 +75,12 @@ SearchOptions.add_argument('--required_coverage',  type=float,
                     help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
                     default = 200 )
 SearchOptions.add_argument('-id', '--min_id',  type=int,
-                    help = "Minimum identity percentage with a query to keep a sequence at the end of a iteration (Default 20)",
+                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 20)",
                     default = 20 )
-SearchOptions.add_argument('-l', '--min_len',  type=int,
+SearchOptions.add_argument('-mal', '--min_ali_len',  type=int,
+                    help = "Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
+                    default = 180 )
+SearchOptions.add_argument('-len', '--min_len',  type=int,
                     help = "Minimum length to keep a sequence at the end of a iteration (Default 200)",
                     default = 200 )
 
@@ -103,6 +108,7 @@ MaxIteration = args.iteration_max
 Threads = args.threads
 Evalue = args.evalue
 MinIdentityPercentage = args.min_id
+MinAliLength = args.min_ali_len
 MinLength = args.min_len
 KeepIterations = args.keep_iterations
 RequiredCoverage = args.required_coverage
@@ -247,7 +253,7 @@ Stop = False
 BaitSequences = QueryFile
 IterationNotFinished = False
 
-StatsDict = {"iter_0":{"IterationTime": 0,
+StatsDict = {0:{"IterationTime": 0,
                 "CumulTime": time.time() - start_time,
                 "LargeCoverage": 0,
                 "StrictCoverage": 0,
@@ -274,14 +280,14 @@ start_iter = time.time()
 while (i < MaxIteration) and (Stop == False):
     start_iter_i = time.time()
     i+=1
-    StatsDict["iter_%d" %(i)] = StatsDict["iter_%d" %(i-1)].copy()
-    StatsDict["iter_%d" %(i)].update({"IterationTime": 0,
+    StatsDict[i] = StatsDict[(i-1)].copy()
+    StatsDict[i].update({"IterationTime": 0,
                 "CumulTime": 0,
                 "BlastTime": 0,
                 "TrinityTime": 0,
                 "Exonerate1Time":0,
                 "Exonerate2Time":0,
-                "PythonTime":0
+                "PythonTime":0,
                 })
     
     logger.info("Iteration %d/%d" %(i,MaxIteration))
@@ -304,8 +310,8 @@ while (i < MaxIteration) and (Stop == False):
     BlastnProcess.OutFormat = "6 sacc"
     # Write read names in ReadNamesFile
     ExitCode = BlastnProcess.launch(ReadNamesFile)
-    StatsDict["iter_%d" %(i)]["BlastTime"] = time.time() - start_blast_time
-    logger.debug("blast --- %s seconds ---" % (StatsDict["iter_%d" %(i)]["BlastTime"]))
+    StatsDict[(i)]["BlastTime"] = time.time() - start_blast_time
+    logger.debug("blast --- %s seconds ---" % (StatsDict[(i)]["BlastTime"]))
     if PairedData:
         # Get paired reads names and remove duplicated names
         ExitCode = ApytramNeeds.add_paired_read_names(ReadNamesFile)
@@ -345,8 +351,8 @@ while (i < MaxIteration) and (Stop == False):
         TrinityProcess.FullCleanup = True
         ExitCode = TrinityProcess.launch()
         TrinityFasta = TrinityFasta + ".Trinity.fasta"
-        StatsDict["iter_%d" %(i)]["TrinityTime"] = time.time() - start_trinity_time
-        logger.debug("trinity --- %s seconds ---" %(StatsDict["iter_%d" %(i)]["TrinityTime"]))
+        StatsDict[(i)]["TrinityTime"] = time.time() - start_trinity_time
+        logger.debug("trinity --- %s seconds ---" %(StatsDict[(i)]["TrinityTime"]))
         if ExitCode != 0: # Trinity found nothing
             logger.error("Trinity found nothing (ExitCode: %d)" %ExitCode)
             Stop = True
@@ -362,8 +368,9 @@ while (i < MaxIteration) and (Stop == False):
             start_exo_time = time.time()
             TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
             # We want to keep only the best hit for each Trinity sequences
-            TrinityExonerateProcess.Bestn = 1
-            TrinityExonerateProcess.Model = "cdna2genome"
+            TrinityExonerateProcess.Bestn = 1 
+            TrinityExonerateProcess.Model = "affine:bestfit" #"cdna2genome"
+            TrinityExonerateProcess.Exhaustive = True
             # We customize our output format
             TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
             TrinityExonerateResult = TrinityExonerateProcess.get_output()
@@ -372,14 +379,14 @@ while (i < MaxIteration) and (Stop == False):
             TrinityExonerateFile.write(TrinityExonerateResult)
             TrinityExonerateFile.close()
             # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
-            BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage)
-            StatsDict["iter_%d" %(i)].update(StatsIter)
+            BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage, MinAliLength)
+            StatsDict[i].update(StatsIter)
             FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-            StatsDict["iter_%d" %(i)]["Exonerate1Time"] = time.time() - start_exo_time
-            logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict["iter_%d" %(i)]["Exonerate1Time"]))
+            StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
+            logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
             
             # Filter hit
-            logger.info("Filter sequence with a identity percentage superior to %d" %(MinIdentityPercentage)) 
+            logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength)) 
             FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
             ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
             
@@ -394,9 +401,9 @@ while (i < MaxIteration) and (Stop == False):
             #Check if the number of contigs has changed
             
             logger.info("Check if the number of contigs has changed")
-            StatsDict["iter_%d" %(i)]["NbContigs"] = len(FilteredSequenceNames)
+            StatsDict[i]["NbContigs"] = len(FilteredSequenceNames)
             
-            if StatsDict["iter_%d" %(i)]["NbContigs"] != StatsDict["iter_%d" %(i-1)]["NbContigs"]:
+            if StatsDict[i]["NbContigs"] != StatsDict[(i-1)]["NbContigs"]:
                  logger.info("The number of contigs has changed")          
             elif i >= 2:
                 logger.info("Refind the \"brother\" contig from the previous contig for each contig and check they are different")
@@ -404,17 +411,22 @@ while (i < MaxIteration) and (Stop == False):
                 start_exo_time = time.time()
                 ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
                 # We want to keep only the best hit for each contigs
+                Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
                 ExonerateProcess.Bestn = 1
-                ExonerateProcess.Model = "est2genome"
+                ExonerateProcess.Model =  "ungapped:trans" # "affine:bestfit"   #"est2genome"
+                #ExonerateProcess.Exhaustive = True
                 # We customize our output format
                 ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
                 ExonerateResult = ExonerateProcess.get_output()
+                ExonerateFile = open(Exonerate,"w")
+                ExonerateFile.write(ExonerateResult)
+                ExonerateFile.close()
                 AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
                 if AlmostIdenticalResults and not FinishAllIter:
                     logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
                     Stop =True
-                StatsDict["iter_%d" %(i)]["Exonerate2Time"] = time.time() - start_exo_time
-                logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict["iter_%d" %(i)]["Exonerate2Time"]))
+                StatsDict[i]["Exonerate2Time"] = time.time() - start_exo_time
+                logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict[(i)]["Exonerate2Time"]))
      
             # Check that the coverage has inscreased compared to the previous iteration
         
@@ -426,24 +438,24 @@ while (i < MaxIteration) and (Stop == False):
             MafftProcess.AdjustdirectionOption = True
             MafftProcess.AddOption = FileteredTrinityFasta
             MafftResult = MafftProcess.get_output()
-            StatsDict["iter_%d" %(i)]["StrictCoverage"], StatsDict["iter_%d" %(i)]["LargeCoverage"] = ApytramNeeds.calculate_coverage(MafftResult)
-            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict["iter_%d" %(i)]["StrictCoverage"], StatsDict["iter_%d" %(i)]["LargeCoverage"]))
-            StatsDict["iter_%d" %(i)]["MafftTime"] = time.time() - start_mafft_time
-            logger.debug("mafft --- %s seconds ---" % (StatsDict["iter_%d" %(i)]["MafftTime"]))
+            StatsDict[i]["StrictCoverage"], StatsDict[(i)]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
+            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"]))
+            StatsDict[i]["MafftTime"] = time.time() - start_mafft_time
+            logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
             
             if not FinishAllIter:
                 # Stop iteration if the Largecoverage is not improved and also the Total length
-                if StatsDict["iter_%d" %(i)]["TotalLength"] > StatsDict["iter_%d" %(i-1)]["TotalLength"]:
+                if StatsDict[(i)]["TotalLength"] > StatsDict[(i-1)]["TotalLength"]:
                     pass
-                elif StatsDict["iter_%d" %(i)]["TotalScore"] > StatsDict["iter_%d" %(i-1)]["TotalScore"]:
+                elif StatsDict[(i)]["TotalScore"] > StatsDict[(i-1)]["TotalScore"]:
                     pass
-                elif StatsDict["iter_%d" %(i)]["LargeCoverage"] <= StatsDict["iter_%d" %(i-1)]["LargeCoverage"]:
+                elif StatsDict[(i)]["LargeCoverage"] <= StatsDict[(i-1)]["LargeCoverage"]:
                     logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
                     Stop = True
 
                 # Stop iteration if the RequiredCoverage is attained
-                if StatsDict["iter_%d" %(i)]["LargeCoverage"] >= RequiredCoverage:
-                    logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StrictCoverage,RequiredCoverage))
+                if StatsDict[(i)]["StrictCoverage"] >= RequiredCoverage:
+                    logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[(i)]["StrictCoverage"],RequiredCoverage))
                     Stop = True
 
             ### Write a fasta file for this iteration if tere is the option --keep_iterations
@@ -467,20 +479,19 @@ while (i < MaxIteration) and (Stop == False):
     else: 
         Reali = i
     
-    NoPythonTime = StatsDict["iter_%d" %(Reali)]["BlastTime"] + StatsDict["iter_%d" %(Reali)]["TrinityTime"] +\
-                 StatsDict["iter_%d" %(Reali)]["MafftTime"] + StatsDict["iter_%d" %(Reali)]["Exonerate1Time"] +\
-                 StatsDict["iter_%d" %(Reali)]["Exonerate2Time"]
-    StatsDict["iter_%d" %(Reali)].update({"IterationTime": time.time() - start_iter_i,
+    NoPythonTime = StatsDict[(Reali)]["BlastTime"] + StatsDict[(Reali)]["TrinityTime"] +\
+                 StatsDict[(Reali)]["MafftTime"] + StatsDict[(Reali)]["Exonerate1Time"] +\
+                 StatsDict[(Reali)]["Exonerate2Time"]
+    StatsDict[(Reali)].update({"IterationTime": time.time() - start_iter_i,
                                           "CumulTime": time.time() - start_iter,
                                           "PythonTime": time.time() - start_iter_i - NoPythonTime })
     
     logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
 
 
-#### Write output
-
-
+#### Write output files
 logger.info("End of Iterations")
+start_output = time.time()
 if i: #We check that there is at least one iteration with a result
     logger.info("Write outputfiles")
     # Best sequences
@@ -488,19 +499,27 @@ if i: #We check that there is at least one iteration with a result
                                                  OutPreffixName+".best.fasta", 
                                                  Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                  Names = BestScoreNames.values(),
-                                                 Message = ".best.")
+                                                 Message = "best_")
     # Last iteration
     ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                  TrinityExonerateResultsDict,
                                                  OutPreffixName+".fasta",
                                                  Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),)
+    start_output_stat = time.time()
     if args.stats:
         logger.info("Write statistics file (OutPreffix.stats.csv)")
         ApytramNeeds.write_stats(StatsDict,OutPreffixName)
+        
         if args.plot:
             logger.info("Create plot from the statistics file (OutPreffix.stats.pdf)")
-            ApytramNeeds.create_plot(StatsDict,OutPreffixName)
+            ApytramNeeds.create_plot(StatsDict, OutPreffixName)
+            logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
         
+        if args.plot_ali:
+            start_output_ali = time.time()
+            logger.info("Create plot from the statistics file (OutPreffix.ali.png)")
+            ApytramNeeds.create_plot_ali(DicPlotCov, OutPreffixName)
+            logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
 else:
     logger.warn("No results")
     
@@ -510,5 +529,6 @@ if not args.tmp:
     #Remove the temporary directory :
     if "tmp_apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
-        
+
+logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
 logger.debug("--- %s seconds ---" % (time.time() - start_time))

@@ -5,7 +5,7 @@ import sys
 import subprocess
 import pandas
 import matplotlib
-matplotlib.use("PDF")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 #matplotlib.style.use('ggplot')
@@ -45,8 +45,8 @@ def are_identical(File1,File2):
             Identical = True
     return Identical
 
-def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
-    "Return Query names if the identity percentage is superior to MinIdentityPercentage"
+def parse_exonerate_results(ExonerateResult, MinIdentityPercentage, MinAliLen):
+    "Return Query names if the identity percentage is superior to MinIdentityPercentage and the alignment length is superir to MinAliLen "
         
     IterStats = {"AverageLength": 0,
                  "TotalLength": 0,
@@ -68,26 +68,29 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage):
         #TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
         ti = ListLine[0]
         qi = ListLine[1]
+        tal = float(ListLine[3])
         pi = float(ListLine[8])
         score = float(ListLine[7])
         tl = float(ListLine[4])
         ql = float(ListLine[2])
-        if pi >=  MinIdentityPercentage:
+        if (pi >=  MinIdentityPercentage) and (tal >= MinAliLen):
             # We keep this sequence
-            ExonerateResultsDict[qi] = ListLine
+            if qi not in ExonerateResultsDict.keys():
+            # A same sequence can be present 2 time if the hit scores are identical.
+            # We keep only the first
+                ExonerateResultsDict[qi] = ListLine
+                IterStats["TotalIdentity"] += pi
+                if IterStats["BestIdentity"] <= pi:
+                    IterStats["BestIdentity"] = pi
 
-            IterStats["TotalIdentity"] += pi
-            if IterStats["BestIdentity"] <= pi:
-                IterStats["BestIdentity"] = pi
-            
-            IterStats["TotalLength"] += ql
-            if IterStats["BestLength"] <= ql:
-                IterStats["BestLength"] = ql
-            
-            IterStats["TotalScore"] += score
-            if IterStats["BestScore"] <= score:
-                IterStats["BestScore"] = score
-                BestScoreNames[ti] = qi
+                IterStats["TotalLength"] += ql
+                if IterStats["BestLength"] <= ql:
+                    IterStats["BestLength"] = ql
+
+                IterStats["TotalScore"] += score
+                if IterStats["BestScore"] <= score:
+                    IterStats["BestScore"] = score
+                    BestScoreNames[ti] = qi
     
     NbContigs = len(ExonerateResultsDict.keys())
     IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
@@ -178,7 +181,7 @@ def write_stats(StatsDict,OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
     df.to_csv("%s.stats.csv" % OutPreffixName)
 
-def create_plot(StatsDict,OutPreffixName):
+def create_plot(StatsDict, OutPreffixName):
     df = pandas.DataFrame(StatsDict).T
     # Categorize columns
     TimeColumns = []
@@ -190,46 +193,77 @@ def create_plot(StatsDict,OutPreffixName):
             OtherColumns.append(col)
         
     with PdfPages("%s.stats.pdf" % OutPreffixName) as pdf:
+        ### Plot 1 ###
         df[OtherColumns].plot(subplots=True,
                               grid = True,
                               legend = "best",
                               figsize=(10, 20),
                               style = "-o")
+        plt.xlabel('Iteration')
         pdf.savefig()
         plt.close()
         
-        df[TimeColumns].plot(kind='bar',
+        ### Plot 2 ###
+        df[TimeColumns].plot(kind ='bar',
                              grid = True,
                              figsize=(10, 10),
                              stacked=True,
                              legend = "best")
         plt.ylabel('seconds')
-        plt.xlabel('Iterations')
+        plt.xlabel('Iteration')
         plt.title('Distribution of the execution time')
         pdf.savefig()
         plt.close()
+
+def create_plot_ali(DictPlotCov, OutPreffixName):
+    ### Plot Ali ###
+    "Create a png file containing a representation of an alignement. The first seqeunce must be the reference."
+    df = pandas.DataFrame(DictPlotCov).T
+    fig, ax = plt.subplots()
+    ax.grid(False)
+    cmap, norm = matplotlib.colors.from_levels_and_colors([0,0.5, 1.5, 2.5,3.5,4.5],
+                                                          ["White","Orange",'Darkgreen','Darkred',"Blue"])
+    heatmap = ax.pcolor(df ,
+                        edgecolors="white",  # put black lines between squares in heatmap
+                        cmap=cmap,
+                        norm=norm)
+    # Format
+    fig = plt.gcf()
+    fig.set_size_inches(3+float(df.shape[1])/12, 1+float(df.shape[0])/2)
+    # put the major ticks at the middle of each cell
+    plt.yticks(np.arange(len(df.index)) + 0.5, df.index, size = 12)
+    ax.xaxis.tick_top()
+    plt.xticks(np.arange(len(df.columns)) + 0.5, df.columns, rotation=90, size= 6)
+    # want a more natural, table-like display
+    ax.invert_yaxis()
+    ax.tick_params(bottom='off', top='off', left='off', right='off') 
+    plt.xlabel('Position')
+    fig.tight_layout()
+    fig.savefig("%s.ali.png" % OutPreffixName)
+    plt.close()
 
 def calculate_coverage(Alignment):
     # The first sequence must be the reference
     #Alignment reading
     Alignment= Alignment.split("\n")
-    dic = {}
-    ref_sequence = ""
-    ref_name = ""
-    sequence = ""
-    name = ""
+    Dic = {}
+    DicPlotCov = {}
+    RefSequence = ""
+    RefName = ""
+    Sequence = ""
+    Name = ""
     # Reference sequence reading
-    while (len(dic.keys()) == 0):
+    while (len(Dic.keys()) == 0):
         line = Alignment.pop(0).replace("\n","")
         if line == "":
             pass
         elif re.match("^>",line):
-            if ref_name != "":
-                dic[ref_name]=ref_sequence
+            if RefName != "":
+                Dic[RefName] = RefSequence
             else:
-                ref_name = line.replace(">","")
+                RefName = line.replace(">","")
         else:
-            ref_sequence+=line
+            RefSequence+=line
 
     # We reput the last line which is the next sequence name in the list
     Alignment.insert(0,line)
@@ -240,49 +274,54 @@ def calculate_coverage(Alignment):
         if line=="":
             pass
         elif re.match("^>",line):
-            if sequence != "":
-                dic[name]=sequence
-                sequence = ""
-            name=line.replace(">","")
+            if Sequence != "":
+                Dic[Name] = Sequence
+                Sequence = ""
+            Name=line.replace(">","")
         else:
-            sequence+=line
+            Sequence+=line
 
-    if sequence != "":
-        dic[name]=sequence
+    if Sequence != "":
+        Dic[Name]=Sequence
 
     # Coverage count
-    length_reference = len(dic[ref_name])
-    # Counters initilisationwrite_stats
-    cov_ref = [0]*length_reference
-    cov_ref_ext = [0]*length_reference
-    ref = [0]*length_reference
+    RefLength = len(Dic[RefName])
+    # Counters initilisation
+    StrictRefCov = [0]*RefLength
+    LargeRefCov = [0]*RefLength
+    Ref = [0]*RefLength
 
-    for contig in dic.keys():
-        if contig == ref_name:
-            for i in range(0,length_reference):
-                if ref_sequence[i] != "-":
-                    ref[i]=1
+    for Contig in Dic.keys():
+        DicPlotCov[Contig] = {}
+        if Contig == RefName:
+            for i in range(0,RefLength):
+                if RefSequence[i] != "-":
+                    Ref[i]=1
+                    DicPlotCov[Contig][i] = 4
         else:
-            sequence = dic[contig]
-            for i in range(0,length_reference):
-                if sequence[i]!='-':
-                    cov_ref_ext[i] =1
-                    if ref_sequence[i] != "-":
-                        cov_ref[i] = 1
+            Sequence = Dic[Contig]
+            for i in range(0,RefLength):
+                if Sequence[i]!='-':
+                    LargeRefCov[i] = 1
+                    if RefSequence[i] != "-":
+                        StrictRefCov[i] = 1
+                        if RefSequence[i] == Sequence[i]:
+                            DicPlotCov[Contig][i] = 2
+                        else:
+                            DicPlotCov[Contig][i] = 3
+                    else:
+                        DicPlotCov[Contig][i] = 1
+                else:
+                    DicPlotCov[Contig][i] = 0
 
     # We count the number of base position in the alignment
-    sum_cov_ref_ext = 0
-    sum_cov_ref = 0
-    sum_ref = 0
-    for i in range(0,length_reference):
-        sum_cov_ref_ext += cov_ref_ext[i]
-        sum_cov_ref += cov_ref[i]
-        sum_ref += ref[i]
+    SumStrictRefCov = sum(StrictRefCov)
+    SumLargeRefCov = sum(LargeRefCov)
+    SumRef = sum(Ref)
 
     #Percentage of positon of the reference which is reprensented in contigs
-    p_cov=float(sum_cov_ref)/float(sum_ref) *100
+    StrictCov=float(SumStrictRefCov)/float(SumRef) *100
     #Percentage of positon in contigs on the number positon of the reference
     #It can be superior to 100 if the contigs are longer than the reference
-    p_cov_ext=float(sum_cov_ref_ext)/float(sum_ref) *100
-
-    return p_cov, p_cov_ext
+    LargeCov=float(SumLargeRefCov)/float(SumRef) *100
+    return StrictCov, LargeCov, DicPlotCov
