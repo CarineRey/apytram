@@ -369,8 +369,7 @@ while (i < MaxIteration) and (Stop == False):
             TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
             # We want to keep only the best hit for each Trinity sequences
             TrinityExonerateProcess.Bestn = 1 
-            TrinityExonerateProcess.Model = "affine:bestfit" #"cdna2genome"
-            TrinityExonerateProcess.Exhaustive = True
+            TrinityExonerateProcess.Model = "cdna2genome"
             # We customize our output format
             TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
             TrinityExonerateResult = TrinityExonerateProcess.get_output()
@@ -413,8 +412,7 @@ while (i < MaxIteration) and (Stop == False):
                 # We want to keep only the best hit for each contigs
                 Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
                 ExonerateProcess.Bestn = 1
-                ExonerateProcess.Model =  "ungapped:trans" # "affine:bestfit"   #"est2genome"
-                #ExonerateProcess.Exhaustive = True
+                ExonerateProcess.Model =  "est2genome"
                 # We customize our output format
                 ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
                 ExonerateResult = ExonerateProcess.get_output()
