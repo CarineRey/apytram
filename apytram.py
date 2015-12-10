@@ -23,57 +23,66 @@ parser = argparse.ArgumentParser(prog = "apytram.py",
     homologous sequences of bait sequences.''')
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
-
+##############
 requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
-                             help='Database preffix name. If a database with the same name already exist, the existing database will be kept and the database will NOT be rebuilt.', required=True)
+                             help='Database preffix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
                              help='single or paired end RNA-seq data', required=True)
+##############
 
 
-
-InOutOptions = parser.add_argument_group('Input and Output Files')
-
-InOutOptions.add_argument('-fa', '--fasta',  type=str,
-                   help = "Fasta formatted RNA-seq data to build the database of reads")
-InOutOptions.add_argument('-fq', '--fastq',  type=str,
-                   help = "Fastq formatted RNA-seq data to build the database of reads. (The fastq will be first convert in fasta file")
-InOutOptions.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nucl) with bait sequence for the apytram run. If no query is submitted, the database will be only build." )
-InOutOptions.add_argument('-pep', '--query_pep',  type=str,
+##############
+InOptions = parser.add_argument_group('Input Files')
+InOptions.add_argument('-fa', '--fasta',  type=str,
+                   help = "Fasta formated RNA-seq data to build the database of reads")
+InOptions.add_argument('-fq', '--fastq',  type=str,
+                   help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first convert in fasta file. Can take time.")
+InOptions.add_argument('-q', '--query',  type=str,
+                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the database will be only build." )
+InOptions.add_argument('-pep', '--query_pep',  type=str,
                    default = "",       
                    help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It must be accompany of the query in nucleotide format (-q option)")
-InOutOptions.add_argument('-out', '--output_preffix',  type=str, default = "./apytram",
-                   help = "Output preffix (Default ./apytram)")
-InOutOptions.add_argument('-tmp',  type=str,
-                    help = "Directory to stock all intermediary files for the apytram run. (default: a directory in /tmp which will be removed at the end)",
-                    default = "" )
-InOutOptions.add_argument('--keep_iterations',  action='store_true',
-                    help = "A fasta file will be created at each iteration.")
-InOutOptions.add_argument('--stats', action='store_true',
-                             help='Create files with statistics on each iteration')
-InOutOptions.add_argument('--plot', action='store_true',
-                             help='Create file with plot on statistics on each iteration')
-InOutOptions.add_argument('--plot_ali', action='store_true',
-                             help='Create file with a plot representing the alignement of all last iteration sequences on the query. Take some seconds. (default: False)')
-InOutOptions.add_argument('-log', type=str, default="apytram.log",
-                   help = "a log file to report avancement (default: apytram.log)")
-
-
-SearchOptions = parser.add_argument_group('Arguments for search thresholds')
-
-SearchOptions.add_argument('-i', '--iteration_max',  type=int,
+InOptions.add_argument('-i', '--iteration_max',  type=int,
                     help = "Maximum number of iteration. (Default 5)",
                     default = 5 )
-InOutOptions.add_argument('--finish_all_iter', action='store_true',
-                    default = False,
-                    help = "apytram will finish all iteration (-i) even if there is no improvment) (default: False)")
+##############
+
+
+##############
+OutOptions = parser.add_argument_group('Output Files')
+OutOptions.add_argument('-out', '--output_preffix',  type=str, default = "./apytram",
+                   help = "Output preffix (Default ./apytram)")
+OutOptions.add_argument('-log', type=str, default="apytram.log",
+                   help = "a log file to report avancement (default: apytram.log)")
+OutOptions.add_argument('-tmp',  type=str,
+                    help = "Directory to stock all intermediary files for the apytram run. (default: a directory in /tmp which will be removed at the end)",
+                    default = "" )
+OutOptions.add_argument('--keep_iterations',  action='store_true',
+                    help = "A fasta file will be created at each iteration. (default: False)")
+
+OutOptions.add_argument('--no_best_file',  action='store_true',
+                        default = False,
+                        help = "The fasta file containing only the best sequence will NOT be created. (Default: False)")
+OutOptions.add_argument('--no_last_iter_file',  action='store_true',
+                        default = False,
+                        help = "The fasta file containing all sequences from the last iteration will NOT be created. (Default: False)")
+
+OutOptions.add_argument('--stats', action='store_true',
+                             help='Create files with statistics on each iteration. (default: False)')
+OutOptions.add_argument('--plot', action='store_true',
+                             help='Create file with plot on statistics on each iteration. (default: False)')
+OutOptions.add_argument('--plot_ali', action='store_true',
+                             help='Create file with a plot representing the alignement of all sequences from the last iteration on the query sequence. Take some seconds. (default: False)')
+##############
+
+
+##############
+SearchOptions = parser.add_argument_group('Thresholds for EACH ITERATION')
 SearchOptions.add_argument('-e', '--evalue',  type=float,
-                    help = "Evalue threshold of the blastn of the bait queries on the database of reads . (Default 1e-3)",
+                    help = "Evalue threshold of the blastn of the bait queries on the database of reads. (Default 1e-3)",
                     default = 1e-3 )
-SearchOptions.add_argument('--required_coverage',  type=float,
-                    help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
-                    default = 200 )
+
 SearchOptions.add_argument('-id', '--min_id',  type=int,
                     help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 20)",
                     default = 20 )
@@ -81,13 +90,45 @@ SearchOptions.add_argument('-mal', '--min_ali_len',  type=int,
                     help = "Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default = 180 )
 SearchOptions.add_argument('-len', '--min_len',  type=int,
-                    help = "Minimum length to keep a sequence at the end of a iteration (Default 200)",
+                    help = "Minimum length to keep a sequence at the end of a iteration. (Default 200)",
                     default = 200 )
+##############
 
+
+##############
+StopOptions = parser.add_argument_group('Criteria to stop iteration')
+StopOptions.add_argument('--required_coverage',  type=float,
+                    help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
+                    default = 200 )
+StopOptions.add_argument('--finish_all_iter', action='store_true',
+                    help = "apytram will finish all iteration (-i) even if there is no improvment.(default: False)",
+                    default = False)
+##############
+
+
+##############
+FinalFilterOptions = parser.add_argument_group('Thresholds for Final output files')
+FinalFilterOptions.add_argument('-flen', '--final_min_len',  type=int,
+                    help = "Minimum percentage of the query length to keep a sequence at the end of the run. (Default: 0)",
+                    default = 0 )
+FinalFilterOptions.add_argument('-fid', '--final_min_id',  type=int,
+                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of the run (Default 0)",
+                    default = 0 )
+FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=int,
+                    help = "",
+                    default = 0 )
+
+
+##############
+
+
+##############
 MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
 MiscellaneousOptions.add_argument('--threads',  type=int,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
+##############
+
 
 ### Option parsing
 args = parser.parse_args()
@@ -110,6 +151,9 @@ Evalue = args.evalue
 MinIdentityPercentage = args.min_id
 MinAliLength = args.min_ali_len
 MinLength = args.min_len
+FinalMinLength = args.final_min_len
+FinalMinIdentityPercentage = args.final_min_id
+FinalMinAliLength = args.final_min_ali_len
 KeepIterations = args.keep_iterations
 RequiredCoverage = args.required_coverage
 FinishAllIter = args.finish_all_iter
@@ -287,6 +331,7 @@ while (i < MaxIteration) and (Stop == False):
                 "TrinityTime": 0,
                 "Exonerate1Time":0,
                 "Exonerate2Time":0,
+                "MafftTime":0,
                 "PythonTime":0,
                 })
     
@@ -378,7 +423,8 @@ while (i < MaxIteration) and (Stop == False):
             TrinityExonerateFile.write(TrinityExonerateResult)
             TrinityExonerateFile.close()
             # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
-            BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage, MinAliLength)
+            BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
+                                     minalilength = MinAliLength)
             StatsDict[i].update(StatsIter)
             FilteredSequenceNames = TrinityExonerateResultsDict.keys()
             StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
@@ -459,12 +505,13 @@ while (i < MaxIteration) and (Stop == False):
             ### Write a fasta file for this iteration if tere is the option --keep_iterations
             
             if KeepIterations:
+                if not args.no_best_file:
                 # Best sequences of the iteration
-                ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                 "%s.iter_%d.best.fasta" %(OutPreffixName,i), 
-                                                 Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                 Names = BestScoreNames.values(),
-                                                 Message = "iter_%d.best." %i)
+                    ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
+                                                     "%s.iter_%d.best.fasta" %(OutPreffixName,i), 
+                                                     Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                     Names = BestScoreNames.values(),
+                                                     Message = "iter_%d.best." %i)
                 # All sequences of the iteration
                 ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                  TrinityExonerateResultsDict,
@@ -481,28 +528,80 @@ while (i < MaxIteration) and (Stop == False):
                  StatsDict[(Reali)]["MafftTime"] + StatsDict[(Reali)]["Exonerate1Time"] +\
                  StatsDict[(Reali)]["Exonerate2Time"]
     StatsDict[(Reali)].update({"IterationTime": time.time() - start_iter_i,
-                                          "CumulTime": time.time() - start_iter,
-                                          "PythonTime": time.time() - start_iter_i - NoPythonTime })
-    
+                                          "CumulTime": time.time() - start_time,
+                                          "PythonTime": time.time() - start_iter_i - NoPythonTime })  
     logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
 
 
-#### Write output files
-logger.info("End of Iterations")
-start_output = time.time()
+
+logger.info("End of Iterations. It takes %s seconds." %(time.time() - start_iter))
+
 if i: #We check that there is at least one iteration with a result
-    logger.info("Write outputfiles")
-    # Best sequences
-    ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                 OutPreffixName+".best.fasta", 
-                                                 Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                 Names = BestScoreNames.values(),
-                                                 Message = "best_")
-    # Last iteration
-    ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
-                                                 TrinityExonerateResultsDict,
-                                                 OutPreffixName+".fasta",
-                                                 Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),)
+    if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
+        #### Final filter which is equivalent at a new iteration
+        StatsDict[Reali+1] = StatsDict[Reali].copy()
+        StatsDict[Reali+1].update({"IterationTime": 0,
+                    "CumulTime": 0,
+                    "BlastTime": 0,
+                    "TrinityTime": 0,
+                    "Exonerate1Time":0,
+                    "Exonerate2Time":0,
+                    "MafftTime":0,
+                    "PythonTime":0,
+                    })
+ 
+        # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
+        BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
+                                         FinalMinIdentityPercentage,
+                                         minalilengthpercentage = FinalMinAliLength,
+                                         minlengthpercentage = FinalMinLength)
+        StatsDict[Reali+1].update(StatsIter)
+        FilteredSequenceNames = TrinityExonerateResultsDict.keys()
+        logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
+        
+        if FilteredSequenceNames: # If sequences pass the last filter
+            # Write Filter hit
+            FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, Reali+1)
+            ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
+            # Calculate the coverage
+            logger.info("Calculate the coverage")
+            # We use Mafft
+            start_mafft_time = time.time()
+            MafftProcess = Aligner.Mafft(QueryFile)
+            MafftProcess.QuietOption = True
+            MafftProcess.AdjustdirectionOption = True
+            MafftProcess.AddOption = FileteredTrinityFasta
+            MafftResult = MafftProcess.get_output()
+            StatsDict[Reali+1]["StrictCoverage"], StatsDict[Reali+1]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
+            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali+1]["StrictCoverage"], StatsDict[Reali+1]["LargeCoverage"]))
+            StatsDict[Reali+1]["MafftTime"] = time.time() - start_mafft_time
+            logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
+
+
+        NoPythonTime = StatsDict[Reali+1]["MafftTime"]
+        StatsDict[(Reali+1)].update({"IterationTime": time.time() - start_iter_i,
+                                     "CumulTime": time.time() - start_time,
+                                     "PythonTime": time.time() - start_iter_i - NoPythonTime })
+
+    start_output = time.time()
+    if FilteredSequenceNames: # If sequences pass the last filter
+        #### Write output files
+        logger.info("Write outputfiles")
+        if not args.no_best_file:
+            # Best sequences
+            ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
+                                                         OutPreffixName+".best.fasta", 
+                                                         Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                         Names = BestScoreNames.values(),
+                                                         Message = "best_")
+        if not args.no_last_iter_file:
+            # Last iteration seqeunces
+            ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
+                                                         TrinityExonerateResultsDict,
+                                                         OutPreffixName+".fasta",
+                                                         Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                         Names = FilteredSequenceNames)
+    # Stats files
     start_output_stat = time.time()
     if args.stats:
         logger.info("Write statistics file (OutPreffix.stats.csv)")
@@ -513,11 +612,11 @@ if i: #We check that there is at least one iteration with a result
             ApytramNeeds.create_plot(StatsDict, OutPreffixName)
             logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
         
-        if args.plot_ali:
-            start_output_ali = time.time()
-            logger.info("Create plot from the statistics file (OutPreffix.ali.png)")
-            ApytramNeeds.create_plot_ali(DicPlotCov, OutPreffixName)
-            logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
+    if args.plot_ali:
+        start_output_ali = time.time()
+        logger.info("Create plot from the statistics file (OutPreffix.ali.png)")
+        ApytramNeeds.create_plot_ali(DicPlotCov, OutPreffixName)
+        logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
 else:
     logger.warn("No results")
     

@@ -45,8 +45,11 @@ def are_identical(File1,File2):
             Identical = True
     return Identical
 
-def parse_exonerate_results(ExonerateResult, MinIdentityPercentage, MinAliLen):
-    "Return Query names if the identity percentage is superior to MinIdentityPercentage and the alignment length is superir to MinAliLen "
+def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
+                            minalilength = 0,
+                            minlengthpercentage = 0,
+                            minalilengthpercentage = 0):
+    "Return Query names if the identity percentage is superior to MinIdentityPercentage and the alignment length is superior to MinAliLen "
         
     IterStats = {"AverageLength": 0,
                  "TotalLength": 0,
@@ -73,7 +76,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage, MinAliLen):
         score = float(ListLine[7])
         tl = float(ListLine[4])
         ql = float(ListLine[2])
-        if (pi >=  MinIdentityPercentage) and (tal >= MinAliLen):
+        if (pi >=  MinIdentityPercentage) and (tal >= minalilength) and (ql >= minlengthpercentage*tl/100) and (tal >= minalilengthpercentage*tl/100) :
             # We keep this sequence
             if qi not in ExonerateResultsDict.keys():
             # A same sequence can be present 2 time if the hit scores are identical.
@@ -93,9 +96,10 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage, MinAliLen):
                     BestScoreNames[ti] = qi
     
     NbContigs = len(ExonerateResultsDict.keys())
-    IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
-    IterStats["AverageLength"] = IterStats["TotalLength"] / NbContigs
-    IterStats["AverageScore"] = IterStats["TotalScore"] / NbContigs
+    if NbContigs:
+        IterStats["AverageIdentity"] = IterStats["TotalIdentity"] / NbContigs 
+        IterStats["AverageLength"] = IterStats["TotalLength"] / NbContigs
+        IterStats["AverageScore"] = IterStats["TotalScore"] / NbContigs
     
     return BestScoreNames, ExonerateResultsDict, IterStats
 
