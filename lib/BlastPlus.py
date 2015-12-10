@@ -22,7 +22,6 @@ class Makeblastdb:
 
         if self.IndexedDatabase:
             command.append("-parse_seqids")
-        subprocess.call(command)
         try:
             ExitCode = subprocess.call(command,
                                        stdout=open("/dev/null", "w"),
