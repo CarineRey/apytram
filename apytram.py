@@ -28,7 +28,7 @@ requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
                              help='Database preffix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
-                             help='single or paired end RNA-seq data', required=True)
+                             help='single or paired end RNA-seq data. ATTENTION: Paired read names must finished by 1 or 2.', required=True)
 ##############
 
 
@@ -451,7 +451,7 @@ while (i < MaxIteration) and (Stop == False):
             if StatsDict[i]["NbContigs"] != StatsDict[(i-1)]["NbContigs"]:
                  logger.info("The number of contigs has changed")          
             elif i >= 2:
-                logger.info("Refind the \"brother\" contig from the previous contig for each contig and check they are different")
+                logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
                 # We use Exonerate 
                 start_exo_time = time.time()
                 ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
