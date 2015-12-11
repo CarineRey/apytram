@@ -9,12 +9,15 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="698.00525"
-   height="286.15018"
+   width="698"
+   height="320.4375"
    id="svg2"
    version="1.1"
    inkscape:version="0.48.4 r9939"
-   sodipodi:docname="CoverageExplanation.svg">
+   sodipodi:docname="CoverageExplanation.svg"
+   inkscape:export-filename="/home/crey02/Documents/Projets/Convergences/Pipeline/apytram/apytram_git/Documentation/CoverageExplanation.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
   <defs
      id="defs4">
     <marker
@@ -54,8 +57,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.7"
-     inkscape:cx="595.87668"
-     inkscape:cy="41.84941"
+     inkscape:cx="595.86113"
+     inkscape:cy="41.841413"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -84,14 +87,15 @@
      inkscape:label="Calque 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(20.703051,-112.42032)">
+     transform="translate(20.6875,-78.125)">
     <rect
-       style="fill:none;stroke:#000000;stroke-width:1.12080085;stroke-opacity:1"
+       style="fill:none;stroke:#000000;stroke-width:1.18611991;stroke-opacity:1"
        id="rect3755"
-       width="696.88446"
-       height="285.02939"
-       x="-20.142651"
-       y="112.98072" />
+       width="696.81915"
+       height="319.24979"
+       x="-20.109991"
+       y="78.727669"
+       ry="0" />
     <g
        id="g3763"
        transform="translate(0,1.4305115e-5)">
@@ -250,5 +254,17 @@
        id="path4674"
        d="m 385.85671,276.31133 240.42941,0"
        style="fill:none;stroke:#000000;stroke-width:1.98465264;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#Arrow2Lstart);marker-mid:none;marker-end:url(#Arrow2Lend)" />
-  </g>
+    <flowRoot
+       transform="translate(-235.62424,-245)"
+       style="font-size:24px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
+       id="flowRoot4676"
+       xml:space="preserve"><flowRegion
+         id="flowRegion4678"><rect
+           style="font-size:24px"
+           y="331.64789"
+           x="273.57144"
+           height="35.714245"
+           width="587.85718"
+           id="rect4680" /></flowRegion><flowPara
+         id="flowPara4682">Explaination of the different coverages meaning</flowPara></flowRoot>  </g>
 </svg>
