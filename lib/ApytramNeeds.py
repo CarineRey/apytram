@@ -181,11 +181,11 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     OutFile.close()  
     return 0
 
-def write_stats(StatsDict,OutPreffixName):
+def write_stats(StatsDict,OutPrefixName):
     df = pandas.DataFrame(StatsDict).T
-    df.to_csv("%s.stats.csv" % OutPreffixName)
+    df.to_csv("%s.stats.csv" % OutPrefixName)
 
-def create_plot(StatsDict, OutPreffixName):
+def create_plot(StatsDict, OutPrefixName):
     df = pandas.DataFrame(StatsDict).T
     # Categorize columns
     TimeColumns = []
@@ -196,7 +196,7 @@ def create_plot(StatsDict, OutPreffixName):
         else:
             OtherColumns.append(col)
         
-    with PdfPages("%s.stats.pdf" % OutPreffixName) as pdf:
+    with PdfPages("%s.stats.pdf" % OutPrefixName) as pdf:
         ### Plot 1 ###
         df[OtherColumns].plot(subplots=True,
                               grid = True,
@@ -219,7 +219,7 @@ def create_plot(StatsDict, OutPreffixName):
         pdf.savefig()
         plt.close()
 
-def create_plot_ali(DictPlotCov, OutPreffixName):
+def create_plot_ali(DictPlotCov, OutPrefixName):
     ### Plot Ali ###
     "Create a png file containing a representation of an alignement. The first seqeunce must be the reference."
     df = pandas.DataFrame(DictPlotCov).T
@@ -243,7 +243,7 @@ def create_plot_ali(DictPlotCov, OutPreffixName):
     ax.tick_params(bottom='off', top='off', left='off', right='off') 
     plt.xlabel('Position')
     fig.tight_layout()
-    fig.savefig("%s.ali.png" % OutPreffixName)
+    fig.savefig("%s.ali.png" % OutPrefixName)
     plt.close()
 
 def calculate_coverage(Alignment):

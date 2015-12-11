@@ -26,7 +26,7 @@ parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 ##############
 requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
-                             help='Database preffix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
+                             help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
                              help='single or paired end RNA-seq data. ATTENTION: Paired read names must finished by 1 or 2.', required=True)
 ##############
@@ -51,8 +51,8 @@ InOptions.add_argument('-i', '--iteration_max',  type=int,
 
 ##############
 OutOptions = parser.add_argument_group('Output Files')
-OutOptions.add_argument('-out', '--output_preffix',  type=str, default = "./apytram",
-                   help = "Output preffix (Default ./apytram)")
+OutOptions.add_argument('-out', '--output_prefix',  type=str, default = "./apytram",
+                   help = "Output prefix (Default ./apytram)")
 OutOptions.add_argument('-log', type=str, default="apytram.log",
                    help = "a log file to report avancement (default: apytram.log)")
 OutOptions.add_argument('-tmp',  type=str,
@@ -205,16 +205,16 @@ else:
     TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
 
 ### Set up the output directory
-if args.output_preffix:
-    OutDirName = os.path.dirname(args.output_preffix)
-    OutPreffixName = args.output_preffix
+if args.output_prefix:
+    OutDirName = os.path.dirname(args.output_prefix)
+    OutPrefixName = args.output_prefix
     if os.path.isdir(OutDirName):
-        logger.info("The output directory %s exists" %(os.path.dirname(args.output_preffix)) )
+        logger.info("The output directory %s exists" %(os.path.dirname(args.output_prefix)) )
     elif OutDirName: # if OutDirName is not a empty string we create the directory
-        logger.info("The temporary directory %s does not exist, it will be created" % (os.path.dirname(args.output_preffix)))
-        os.makedirs(os.path.dirname(args.output_preffix))
+        logger.info("The temporary directory %s does not exist, it will be created" % (os.path.dirname(args.output_prefix)))
+        os.makedirs(os.path.dirname(args.output_prefix))
 else:
-    logger.error("The output preffix must be defined")
+    logger.error("The output prefix must be defined")
     sys.exit(1)
 
 ### Check that query files exist
@@ -508,14 +508,14 @@ while (i < MaxIteration) and (Stop == False):
                 if not args.no_best_file:
                 # Best sequences of the iteration
                     ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                     "%s.iter_%d.best.fasta" %(OutPreffixName,i), 
+                                                     "%s.iter_%d.best.fasta" %(OutPrefixName,i), 
                                                      Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                      Names = BestScoreNames.values(),
                                                      Message = "iter_%d.best." %i)
                 # All sequences of the iteration
                 ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                  TrinityExonerateResultsDict,
-                                                 "%s.iter_%d.fasta" %(OutPreffixName,i),
+                                                 "%s.iter_%d.fasta" %(OutPrefixName,i),
                                                  Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                  Message = "iter_%d." %i)
 
@@ -590,7 +590,7 @@ if i: #We check that there is at least one iteration with a result
         if not args.no_best_file:
             # Best sequences
             ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                         OutPreffixName+".best.fasta", 
+                                                         OutPrefixName+".best.fasta", 
                                                          Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                          Names = BestScoreNames.values(),
                                                          Message = "best_")
@@ -598,24 +598,24 @@ if i: #We check that there is at least one iteration with a result
             # Last iteration seqeunces
             ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                          TrinityExonerateResultsDict,
-                                                         OutPreffixName+".fasta",
+                                                         OutPrefixName+".fasta",
                                                          Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                          Names = FilteredSequenceNames)
     # Stats files
     start_output_stat = time.time()
     if args.stats:
-        logger.info("Write statistics file (OutPreffix.stats.csv)")
-        ApytramNeeds.write_stats(StatsDict,OutPreffixName)
+        logger.info("Write statistics file (OutPrefix.stats.csv)")
+        ApytramNeeds.write_stats(StatsDict,OutPrefixName)
         
         if args.plot:
-            logger.info("Create plot from the statistics file (OutPreffix.stats.pdf)")
-            ApytramNeeds.create_plot(StatsDict, OutPreffixName)
+            logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
+            ApytramNeeds.create_plot(StatsDict, OutPrefixName)
             logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
         
     if args.plot_ali:
         start_output_ali = time.time()
-        logger.info("Create plot from the statistics file (OutPreffix.ali.png)")
-        ApytramNeeds.create_plot_ali(DicPlotCov, OutPreffixName)
+        logger.info("Create plot from the statistics file (OutPrefix.ali.png)")
+        ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
         logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
 else:
     logger.warn("No results")
