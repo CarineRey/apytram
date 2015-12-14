@@ -627,6 +627,7 @@ if i: #We check that there is at least one iteration with a result
         logger.info("Create plot from the statistics file (OutPrefix.ali.png)")
         ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
         logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
+    logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
 else:
     logger.warn("No results")
     
@@ -637,5 +638,4 @@ if not args.tmp:
     if "tmp_apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
 
-logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
 logger.debug("--- %s seconds ---" % (time.time() - start_time))
