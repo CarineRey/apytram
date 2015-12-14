@@ -16,8 +16,8 @@
    inkscape:version="0.48.4 r9939"
    sodipodi:docname="CoverageExplanation.svg"
    inkscape:export-filename="/home/crey02/Documents/Projets/Convergences/Pipeline/apytram/apytram_git/Documentation/CoverageExplanation.png"
-   inkscape:export-xdpi="90"
-   inkscape:export-ydpi="90">
+   inkscape:export-xdpi="45"
+   inkscape:export-ydpi="45">
   <defs
      id="defs4">
     <marker
@@ -57,8 +57,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.7"
-     inkscape:cx="595.86113"
-     inkscape:cy="41.841413"
+     inkscape:cx="366.6354"
+     inkscape:cy="42.11414"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -255,7 +255,7 @@
        d="m 385.85671,276.31133 240.42941,0"
        style="fill:none;stroke:#000000;stroke-width:1.98465264;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-start:url(#Arrow2Lstart);marker-mid:none;marker-end:url(#Arrow2Lend)" />
     <flowRoot
-       transform="translate(-235.62424,-245)"
+       transform="translate(-120.21799,-245)"
        style="font-size:24px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
        id="flowRoot4676"
        xml:space="preserve"><flowRegion
@@ -263,8 +263,8 @@
            style="font-size:24px"
            y="331.64789"
            x="273.57144"
-           height="35.714245"
-           width="587.85718"
+           height="32.85709"
+           width="367.85715"
            id="rect4680" /></flowRegion><flowPara
-         id="flowPara4682">Explaination of the different coverages meaning</flowPara></flowRoot>  </g>
+         id="flowPara4682">Different coverages meaning</flowPara></flowRoot>  </g>
 </svg>
