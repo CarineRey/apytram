@@ -28,7 +28,7 @@ requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
                              help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
-                             help='single or paired end RNA-seq data. ATTENTION: Paired read names must finished by 1 or 2.', required=True)
+                             help='single or paired end RNA-seq data. WARNING: Paired read names must finished by 1 or 2.', required=True)
 ##############
 
 
@@ -37,14 +37,14 @@ InOptions = parser.add_argument_group('Input Files')
 InOptions.add_argument('-fa', '--fasta',  type=str,
                    help = "Fasta formated RNA-seq data to build the database of reads")
 InOptions.add_argument('-fq', '--fastq',  type=str,
-                   help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first convert in fasta file. Can take time.")
+                   help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first converted to a fasta file. This process can require some time.")
 InOptions.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the database will be only build." )
+                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the program will just build the database." )
 InOptions.add_argument('-pep', '--query_pep',  type=str,
                    default = "",       
-                   help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It must be accompany of the query in nucleotide format (-q option)")
+                   help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
 InOptions.add_argument('-i', '--iteration_max',  type=int,
-                    help = "Maximum number of iteration. (Default 5)",
+                    help = "Maximum number of iterations. (Default 5)",
                     default = 5 )
 ##############
 
@@ -60,18 +60,21 @@ OutOptions.add_argument('-tmp',  type=str,
                     default = "" )
 OutOptions.add_argument('--keep_iterations',  action='store_true',
                     help = "A fasta file will be created at each iteration. (default: False)")
-
+#comm Marie : A fasta file with the resulting contigs?
 OutOptions.add_argument('--no_best_file',  action='store_true',
                         default = False,
                         help = "The fasta file containing only the best sequence will NOT be created. (Default: False)")
+#comm Marie : tu m'explqueras? -->  pas très clair la double négation. The fasta file containing  the best sequence will NOT be created. ??
+
 OutOptions.add_argument('--no_last_iter_file',  action='store_true',
                         default = False,
                         help = "The fasta file containing all sequences from the last iteration will NOT be created. (Default: False)")
-
+#comm Marie : idem
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
+# comm Marie : tu expliques les détails des stats quelque part?                             
 OutOptions.add_argument('--plot', action='store_true',
-                             help='Create file with plot on statistics on each iteration. (default: False)')
+                             help='Create plots to represent the statistics on each iteration. (default: False)')
 OutOptions.add_argument('--plot_ali', action='store_true',
                              help='Create file with a plot representing the alignement of all sequences from the last iteration on the query sequence. Take some seconds. (default: False)')
 ##############
@@ -103,6 +106,8 @@ StopOptions.add_argument('--required_coverage',  type=float,
 StopOptions.add_argument('--finish_all_iter', action='store_true',
                     help = "apytram will finish all iteration (-i) even if there is no improvment.(default: False)",
                     default = False)
+# com Marie : pas clair pour moi si on finit l'itération ou bien si on va au nombre max des itérations                    
+                    
 ##############
 
 
@@ -144,7 +149,7 @@ args = parser.parse_args()
 #                             -i 5'''.split())
 
 
-### Arguments reading
+### Read the arguments
 MaxIteration = args.iteration_max
 Threads = args.threads
 Evalue = args.evalue
@@ -224,7 +229,7 @@ if args.query:
         logger.error(args.query+" (-q) is not a file.")
         sys.exit(1)
 
-# If the -pep option is used, the -q option must be precise
+# If the -pep option is used, the -q option must be precised
 if args.query_pep:
     if not os.path.isfile(args.query_pep):
         logger.error(args.query_pep+" (-pep) is not a file.")
@@ -234,7 +239,7 @@ if args.query_pep:
         logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
         sys.exit(1)
 
-### Check that there is a database else built it
+### Check that there is a database, otherwise build it
 DatabaseName = args.database
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
@@ -267,6 +272,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
         ExitCode = MakeblastdbProcess.launch()
     else :
         logger.error("The database is not formatted ! A fasta file (-fa) or a fastq file (-fq) is required !")
+# comm Marie : veux tu dire : the database could not be formatted because a fasta file is required? ou bien mauvais format : There was an error while formatting the database?
         sys.exit(1)
 
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
@@ -279,7 +285,7 @@ else:
 
 ### If there is a query continue, else stop
 if not args.query:
-    logger.info("There is no query (-q), apytram have finished.")
+    logger.info("There is no query (-q), apytram has finished.")
     quit()
 elif not os.path.isfile(args.query):
     logger.error(args.query+" (-q) is not a file.")
@@ -367,7 +373,7 @@ while (i < MaxIteration) and (Stop == False):
     # Compare the read list names with the list of the previous iteration:
     Identical = ApytramNeeds.are_identical(ReadNamesFile,"%s/ReadNames.%d.txt" % (TmpDirName,i-1))
     if Identical and not FinishAllIter:
-        logger.info("Reads from the current iteration are identical than the previous")
+        logger.info("Reads from the current iteration are identical to reads from the previous iteration")
         Stop = True
         IterationNotFinished = True
         i -= 1
@@ -408,17 +414,17 @@ while (i < MaxIteration) and (Stop == False):
             ### Filter Trinity contigs to keep only homologous sequences of the reference genes
             
             logger.info("Compare Trinity results with query sequences")
-            # We use Exonerate 
+            # Use Exonerate 
             TrinityExonerate = "%s/Trinity_iter_%d.exonerate" % (TmpDirName, i)
             start_exo_time = time.time()
             TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
-            # We want to keep only the best hit for each Trinity sequences
+            # Keep only the best hit for each contig from Trinity 
             TrinityExonerateProcess.Bestn = 1 
             TrinityExonerateProcess.Model = "cdna2genome"
-            # We customize our output format
+            # Customize the output format
             TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
             TrinityExonerateResult = TrinityExonerateProcess.get_output()
-            # We write the result in a file
+            # Write the result in a file
             TrinityExonerateFile = open(TrinityExonerate,"w")
             TrinityExonerateFile.write(TrinityExonerateResult)
             TrinityExonerateFile.close()
@@ -430,7 +436,9 @@ while (i < MaxIteration) and (Stop == False):
             StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
             logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
             
-            # Filter hit
+            # Filter the hit
+# Comm Marie : pas clair vu que tu dis plus haut déjà que tu filtres sur l'identité non?
+
             logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength)) 
             FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
             ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
@@ -452,14 +460,16 @@ while (i < MaxIteration) and (Stop == False):
                  logger.info("The number of contigs has changed")          
             elif i >= 2:
                 logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
-                # We use Exonerate 
+                # Use Exonerate 
+# Comm Marie : pas compris le coup des 2 exonerate (par rapport à celui d'avant) -- en vrai j'ai compris et indiqué dans readme mais peux tu etre un peu plus explicite ici?
+
                 start_exo_time = time.time()
                 ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
-                # We want to keep only the best hit for each contigs
+                # Keep only the best hit for each contigs
                 Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
                 ExonerateProcess.Bestn = 1
                 ExonerateProcess.Model =  "est2genome"
-                # We customize our output format
+                # Customize the output format
                 ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
                 ExonerateResult = ExonerateProcess.get_output()
                 ExonerateFile = open(Exonerate,"w")
@@ -472,10 +482,10 @@ while (i < MaxIteration) and (Stop == False):
                 StatsDict[i]["Exonerate2Time"] = time.time() - start_exo_time
                 logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict[(i)]["Exonerate2Time"]))
      
-            # Check that the coverage has inscreased compared to the previous iteration
+            # Check that the coverage has increased compared to the previous iteration
         
             logger.info("Check that the coverage has inscreased compared to the previous iteration")
-            # We use Mafft
+            # Use Mafft
             start_mafft_time = time.time()
             MafftProcess = Aligner.Mafft(QueryFile)
             MafftProcess.QuietOption = True
@@ -488,7 +498,7 @@ while (i < MaxIteration) and (Stop == False):
             logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
             
             if not FinishAllIter:
-                # Stop iteration if the Largecoverage is not improved and also the Total length
+                # Stop iteration if both Largecoverage and Total length are not improved
                 if StatsDict[(i)]["TotalLength"] > StatsDict[(i-1)]["TotalLength"]:
                     pass
                 elif StatsDict[(i)]["TotalScore"] > StatsDict[(i-1)]["TotalScore"]:
@@ -497,12 +507,12 @@ while (i < MaxIteration) and (Stop == False):
                     logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
                     Stop = True
 
-                # Stop iteration if the RequiredCoverage is attained
+                # Stop iteration if the RequiredCoverage is reached
                 if StatsDict[(i)]["StrictCoverage"] >= RequiredCoverage:
                     logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[(i)]["StrictCoverage"],RequiredCoverage))
                     Stop = True
 
-            ### Write a fasta file for this iteration if tere is the option --keep_iterations
+            ### Write a fasta file for this iteration if the option --keep_iterations was selected
             
             if KeepIterations:
                 if not args.no_best_file:
