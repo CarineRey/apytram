@@ -25,7 +25,7 @@ parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
 ##############
 requiredOptions = parser.add_argument_group('Required arguments')
-requiredOptions.add_argument('-d', '--database', nargs='?', type=str,
+requiredOptions.add_argument('-d', '--database', type=str,
                              help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
                              help='single or paired end RNA-seq data. WARNING: Paired read names must finished by 1 or 2.', required=True)
@@ -63,13 +63,12 @@ OutOptions.add_argument('--keep_iterations',  action='store_true',
 #comm Marie : A fasta file with the resulting contigs?
 OutOptions.add_argument('--no_best_file',  action='store_true',
                         default = False,
-                        help = "The fasta file containing only the best sequence will NOT be created. (Default: False)")
-#comm Marie : tu m'explqueras? -->  pas très clair la double négation. The fasta file containing  the best sequence will NOT be created. ??
+                        help = "By default, a fasta file (Outprefix.best.fasta) containing only the best sequence is created. If this option is used, it will NOT be created.")
 
 OutOptions.add_argument('--no_last_iter_file',  action='store_true',
                         default = False,
-                        help = "The fasta file containing all sequences from the last iteration will NOT be created. (Default: False)")
-#comm Marie : idem
+                        help = "By default, a fasta file (Outprefix.fasta) containing all sequences from the last iteration is created. If this option is used, it will NOT be created.")
+
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
 # comm Marie : tu expliques les détails des stats quelque part?                             
@@ -104,9 +103,8 @@ StopOptions.add_argument('--required_coverage',  type=float,
                     help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
                     default = 200 )
 StopOptions.add_argument('--finish_all_iter', action='store_true',
-                    help = "apytram will finish all iteration (-i) even if there is no improvment.(default: False)",
-                    default = False)
-# com Marie : pas clair pour moi si on finit l'itération ou bien si on va au nombre max des itérations                    
+                    help = "By default, iterations are stop if there is no improvment, if this option is used apytram will finish all iteration (-i).",
+                    default = False)              
                     
 ##############
 
@@ -114,16 +112,14 @@ StopOptions.add_argument('--finish_all_iter', action='store_true',
 ##############
 FinalFilterOptions = parser.add_argument_group('Thresholds for Final output files')
 FinalFilterOptions.add_argument('-flen', '--final_min_len',  type=int,
-                    help = "Minimum percentage of the query length to keep a sequence at the end of the run. (Default: 0)",
+                    help = "Minimum PERCENTAGE of the query length to keep a sequence at the end of the run. (Default: 0)",
                     default = 0 )
 FinalFilterOptions.add_argument('-fid', '--final_min_id',  type=int,
-                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of the run (Default 0)",
+                    help = "Minimum identity PERCENTAGE of a sequence with a query on the length of their alignment so that the sequence is kept at the end of the run (Default 0)",
                     default = 0 )
 FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=int,
-                    help = "",
+                     help = "Alignment length between a sequence and a query must be at least this PERCENTAGE of the query length to keep this sequence at the end of the run. (Default: 0)",
                     default = 0 )
-
-
 ##############
 
 
