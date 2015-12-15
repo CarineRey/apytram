@@ -125,7 +125,7 @@ FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=int,
 
 ##############
 MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
-MiscellaneousOptions.add_argument('--threads',  type=int,
+MiscellaneousOptions.add_argument('-threads',  type=int,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
 ##############
