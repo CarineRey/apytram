@@ -548,6 +548,7 @@ logger.info("End of Iterations. It takes %s seconds." %(time.time() - start_iter
 
 if i: #We check that there is at least one iteration with a result
     if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
+        start_iter_i = time.time()
         #### Final filter which is equivalent at a new iteration
         StatsDict[Reali+1] = StatsDict[Reali].copy()
         StatsDict[Reali+1].update({"IterationTime": 0,
