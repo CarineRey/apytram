@@ -388,7 +388,7 @@ while (i < MaxIteration) and (Stop == False):
 
             ### Retrieve sequences
 
-            logger.info("Retrieve sequences")
+            logger.info("Retrieve reads sequences")
             ReadFasta = TmpDirName + "/Reads.%d.fasta" % (i)
             BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
             BlastdbcmdProcess.launch()
@@ -582,7 +582,7 @@ if i: #We check that there is at least one iteration with a result
                                          FinalMinIdentityPercentage,
                                          minalilengthpercentage = FinalMinAliLength,
                                          minlengthpercentage = FinalMinLength)
-        StatsDict[Reali+1].update(StatsIter)
+        StatsDict[Reali].update(StatsIter)
         FilteredSequenceNames = TrinityExonerateResultsDict.keys()
         logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
         
