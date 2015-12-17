@@ -47,6 +47,13 @@ def count_lines(File):
         Number = Exit.split(" ")[0]
     return int(Number)
 
+def count_sequences(File):
+    Number = 0
+    if os.path.isfile(File):
+        Exit = subprocess.check_output(["grep \"^>\" %s | wc -l" %File], shell=True) 
+        Number = Exit.replace("\n","")
+    return int(Number)
+
 def are_identical(File1,File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):

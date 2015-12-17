@@ -225,6 +225,9 @@ if args.query:
     elif not os.stat(args.query).st_size:
         logger.error(args.query+" (-q) is empty.")
         sys.exit(1)
+    elif ApytramNeeds.count_sequences(args.query) !=1:
+        logger.error(args.query+" (-q) contains more than one query.")
+        sys.exit(1)
 
 # If the -pep option is used, the -q option must be precised
 if args.query_pep:
@@ -322,7 +325,7 @@ StatsDict = {0:{"IterationTime": 0,
                 "Exonerate1Time":0,
                 "Exonerate2Time":0,
                 "MafftTime":0,
-                "PythonTime":0
+                "PythonTime":time.time() - start_time
                 }}
     
 logger.info("Iterations begin")
@@ -639,7 +642,7 @@ if i: #We check that there is at least one iteration with a result
             logger.info("Create plot of the final alignment (OutPrefix.ali.png)")         
             ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
         else:
-            logger.error("Final alignment is longger than 3000 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
+            logger.warn("Final alignment is longger than 3000 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
         logger.info("Write the final alignment in OutPrefix.ali.fasta")
         ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
         logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
