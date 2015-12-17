@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import subprocess
@@ -8,6 +9,7 @@ import subprocess
 class Exonerate:
     """Define an object to launch Exonerate"""
     def __init__(self, TargetFile, QueryFile):
+        self.logger = logging.getLogger('apytram.lib.Exonerate')
         self.TargetFile = TargetFile
         self.QueryFile = QueryFile
         self.Model = ""
@@ -34,7 +36,8 @@ class Exonerate:
             command.extend(["--ryo",str(self.Ryo)])
         if self.Exhaustive:
             command.extend(["--exhaustive","T"])
-
+        
+        self.logger.debug(" ".join(command))
         try:
             Out = subprocess.check_output(command,
                                          stderr=open("/dev/null", "w"))
@@ -56,6 +59,7 @@ class Exonerate:
 class Mafft:
     """Define an object to launch Mafft"""
     def __init__(self, InputFile):
+        self.logger = logging.getLogger('apytram.lib.Mafft')
         self.InputFile = InputFile
         self.AddOption = False
         self.AdjustdirectionOption = False
@@ -77,6 +81,7 @@ class Mafft:
             command.append("--quiet")
         
         command.append(self.InputFile)
+        self.logger.debug(" ".join(command))
         try:
             Out = subprocess.check_output(command,
                                           stderr=open("/dev/null", "w"))
