@@ -59,8 +59,7 @@ OutOptions.add_argument('-tmp',  type=str,
                     help = "Directory to stock all intermediary files for the apytram run. (default: a directory in /tmp which will be removed at the end)",
                     default = "" )
 OutOptions.add_argument('--keep_iterations',  action='store_true',
-                    help = "A fasta file will be created at each iteration. (default: False)")
-#comm Marie : A fasta file with the resulting contigs?
+                    help = "A fasta file containing reconstructed sequences will be created at each iteration. (default: False)")
 OutOptions.add_argument('--no_best_file',  action='store_true',
                         default = False,
                         help = "By default, a fasta file (Outprefix.best.fasta) containing only the best sequence is created. If this option is used, it will NOT be created.")
@@ -169,7 +168,7 @@ if args.plot:
     
 
 
-### Set up the output directory
+### Set up the log directory
 if args.log:
     LogDirName = os.path.dirname(args.log)
     if not os.path.isdir(LogDirName) and LogDirName:
@@ -219,7 +218,6 @@ else:
     sys.exit(1)
 
 ### Check that query files exist
-
 if args.query:
     if not os.path.isfile(args.query):
         logger.error(args.query+" (-q) is not a file.")
@@ -250,7 +248,9 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 # Format the fastq file in fasta
                 InputFasta = TmpDirName + "/" + os.path.basename(args.fastq) + ".fasta"
                 logger.info("Convert the fastq file in fasta format")
+                start_convert = time.time()
                 ExitCode = ApytramNeeds.fastq2fasta(args.fastq,InputFasta)
+                logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
             InputFasta = args.fasta
             
@@ -313,6 +313,7 @@ StatsDict = {0:{"IterationTime": 0,
                 "AverageIdentity": 0,
                 "TotalIdentity": 0,
                 "BestIdentity":0,
+                "ReadsNumber":0,
                 "BlastTime": 0,
                 "TrinityTime": 0,
                 "Exonerate1Time":0,
@@ -357,7 +358,7 @@ while (i < MaxIteration) and (Stop == False):
     BlastnProcess.OutFormat = "6 sacc"
     # Write read names in ReadNamesFile
     ExitCode = BlastnProcess.launch(ReadNamesFile)
-    StatsDict[(i)]["BlastTime"] = time.time() - start_blast_time
+    StatsDict[i]["BlastTime"] = time.time() - start_blast_time
     logger.debug("blast --- %s seconds ---" % (StatsDict[(i)]["BlastTime"]))
     if PairedData:
         # Get paired reads names and remove duplicated names
@@ -365,7 +366,8 @@ while (i < MaxIteration) and (Stop == False):
     else:
         # Remove duplicated names
         ExitCode = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
-        
+    # Count the number of reads whic will be used in the Trinity assembly
+    StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
     # Compare the read list names with the list of the previous iteration:
     Identical = ApytramNeeds.are_identical(ReadNamesFile,"%s/ReadNames.%d.txt" % (TmpDirName,i-1))
     if Identical and not FinishAllIter:
@@ -545,9 +547,10 @@ logger.info("End of Iterations. It takes %s seconds." %(time.time() - start_iter
 if i: #We check that there is at least one iteration with a result
     if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
         start_iter_i = time.time()
+        Reali +=1
         #### Final filter which is equivalent at a new iteration
-        StatsDict[Reali+1] = StatsDict[Reali].copy()
-        StatsDict[Reali+1].update({"IterationTime": 0,
+        StatsDict[Reali] = StatsDict[Reali].copy()
+        StatsDict[Reali].update({"IterationTime": 0,
                     "CumulTime": 0,
                     "BlastTime": 0,
                     "TrinityTime": 0,
@@ -570,25 +573,6 @@ if i: #We check that there is at least one iteration with a result
             # Write Filter hit
             FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, Reali+1)
             ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
-            # Calculate the coverage
-            logger.info("Calculate the coverage")
-            # We use Mafft
-            start_mafft_time = time.time()
-            MafftProcess = Aligner.Mafft(QueryFile)
-            MafftProcess.QuietOption = True
-            MafftProcess.AdjustdirectionOption = True
-            MafftProcess.AddOption = FileteredTrinityFasta
-            MafftResult = MafftProcess.get_output()
-            StatsDict[Reali+1]["StrictCoverage"], StatsDict[Reali+1]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
-            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali+1]["StrictCoverage"], StatsDict[Reali+1]["LargeCoverage"]))
-            StatsDict[Reali+1]["MafftTime"] = time.time() - start_mafft_time
-            logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
-
-
-        NoPythonTime = StatsDict[Reali+1]["MafftTime"]
-        StatsDict[(Reali+1)].update({"IterationTime": time.time() - start_iter_i,
-                                     "CumulTime": time.time() - start_time,
-                                     "PythonTime": time.time() - start_iter_i - NoPythonTime })
 
     start_output = time.time()
     if FilteredSequenceNames: # If sequences pass the last filter
@@ -608,8 +592,42 @@ if i: #We check that there is at least one iteration with a result
                                                          OutPrefixName+".fasta",
                                                          Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                          Names = FilteredSequenceNames)
+        
+        if args.plot_ali or args.stats:
+            ### Calculate the coverage
+            logger.info("Calculate the final coverage")
+            # Use Mafft
+            start_mafft_time = time.time()
+            MafftProcess = Aligner.Mafft(QueryFile)
+            MafftProcess.QuietOption = True
+            MafftProcess.AdjustdirectionOption = True
+            MafftProcess.AddOption = OutPrefixName+".fasta"
+            MafftResult = MafftProcess.get_output()
+            StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
+            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
+            StatsDict[Reali]["MafftTime"] = time.time() - start_mafft_time
+            logger.debug("mafft --- %s seconds ---" % (StatsDict[Reali]["MafftTime"]))
+
+            NoPythonTime += StatsDict[Reali]["MafftTime"]
+            StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
+                                         "CumulTime": time.time() - start_time,
+                                         "PythonTime": time.time() - start_iter_i - NoPythonTime })
+
     # Stats files
     start_output_stat = time.time()
+    if args.plot_ali:
+        start_output_ali = time.time()
+        LengthAlignment = len(DicPlotCov[DicPlotCov.keys()[0]])
+        if LengthAlignment <= 3000:
+            logger.info("Create plot of the final alignment (OutPrefix.ali.png)")         
+            ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
+        else:
+            logger.error("Final alignment is longger than 3000 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
+        logger.info("Write the final alignment in OutPrefix.ali.fasta")
+        ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
+        logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
+        
+        
     if args.stats:
         logger.info("Write statistics file (OutPrefix.stats.csv)")
         ApytramNeeds.write_stats(StatsDict,OutPrefixName)
@@ -618,12 +636,7 @@ if i: #We check that there is at least one iteration with a result
             logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
             ApytramNeeds.create_plot(StatsDict, OutPrefixName)
             logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
-        
-    if args.plot_ali:
-        start_output_ali = time.time()
-        logger.info("Create plot from the statistics file (OutPrefix.ali.png)")
-        ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
-        logger.debug("Writing alignment plot --- %s seconds ---" % (time.time() - start_output_ali))
+            
     logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
 else:
     logger.warn("No results")

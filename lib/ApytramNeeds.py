@@ -16,6 +16,12 @@ def fastq2fasta(FastqFile,FastaFile):
     os.system(command)
     return ExitCode
 
+def write_in_file(String,Filename,mode = "w"):
+    if mode in ["w","a"]:
+        File = open(Filename,mode)
+        File.write(String)
+        File.close()   
+    
 def add_paired_read_names(File):
     "Add paired read name to a read name list"
     if os.path.isfile(File):
@@ -34,6 +40,12 @@ def remove_duplicated_read_names(File):
         os.system(command2)
     return 0
 
+def count_lines(File):
+    Number = 0
+    if os.path.isfile(File):
+        Exit = subprocess.check_output(["wc", "-l", File])  
+        Number = Exit.split(" ")[0]
+    return int(Number)
 
 def are_identical(File1,File2):
     Identical = False
@@ -246,7 +258,7 @@ def create_plot_ali(DictPlotCov, OutPrefixName):
     fig.savefig("%s.ali.png" % OutPrefixName)
     plt.close()
 
-def calculate_coverage(Alignment):
+def calculate_coverage(Alignment, NbRefSeq = 1):
     # The first sequence must be the reference
     #Alignment reading
     Alignment= Alignment.split("\n")
@@ -257,7 +269,7 @@ def calculate_coverage(Alignment):
     Sequence = ""
     Name = ""
     # Reference sequence reading
-    while (len(Dic.keys()) == 0):
+    while (len(Dic.keys()) != NbRefSeq):
         line = Alignment.pop(0).replace("\n","")
         if line == "":
             pass
@@ -271,7 +283,6 @@ def calculate_coverage(Alignment):
 
     # We reput the last line which is the next sequence name in the list
     Alignment.insert(0,line)
-
     # Other contig reading
     for line in Alignment:
         line=line.replace("\n","")
