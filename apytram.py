@@ -46,6 +46,9 @@ InOptions.add_argument('-pep', '--query_pep',  type=str,
 InOptions.add_argument('-i', '--iteration_max',  type=int,
                     help = "Maximum number of iterations. (Default 5)",
                     default = 5 )
+InOptions.add_argument('-i_start','--iteration_start',  type=int,
+                    help = "Number of the first iteration. If different of 1, the tmp option must be used. (Default: 1)",
+                    default = 1 )
 ##############
 
 
@@ -184,14 +187,20 @@ fh = logging.FileHandler(LogFile)
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.ERROR)
+ch.setLevel(logging.WARN)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
+formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
+
+### If iteration begin not from 1, the temporary directory must be given by the user
+if StartIteration != 1 and not args.tmp:
+    logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
+    sys.exit(1)    
 
 ### Set up the working directory
 if args.tmp:
@@ -295,8 +304,6 @@ elif not os.path.isfile(args.query):
 else:
     QueryFile = args.query
     logger.info("DB: \"%s\"\tQuery: \"%s\"" %(DatabaseName,QueryFile))
-    
-    
 
 ### Make iterations
 # Initialisation
@@ -330,9 +337,26 @@ StatsDict = {0:{"IterationTime": 0,
     
 logger.info("Iterations begin")
 start_iter = time.time()
+
+### If apytram restart a job
+if StartIteration != 1 :
+    for i in range(1,StartIteration):
+        logger.debug("Iteration %s has already been executed" %i)
+        StatsDict[i] = StatsDict[(i-1)].copy()
+    Reali = i
+    ### Last Trinity filtered file is the baitfile
+    BaitSequences = "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
+    ### Chech that the bait file exists and is not empty
+    if not os.path.isfile(BaitSequences):
+        logger.error("%s does not exit, apytram can not restart this job at the iteration %s because the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
+        exit(1)
+    elif not os.stat(BaitSequences).st_size:
+        logger.error("%s is empty, apytram can not restart this job at the iteration %sbecause the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
+        exit(1)
+        
 while (i < MaxIteration) and (Stop == False):
     start_iter_i = time.time()
-    i+=1
+    i += 1
     StatsDict[i] = StatsDict[(i-1)].copy()
     StatsDict[i].update({"IterationTime": 0,
                 "CumulTime": 0,
@@ -362,18 +386,27 @@ while (i < MaxIteration) and (Stop == False):
 
     BlastnProcess.Threads = Threads
     BlastnProcess.OutFormat = "6 sacc"
-    # Write read names in ReadNamesFile
-    ExitCode = BlastnProcess.launch(ReadNamesFile)
+
+    # Write read names in ReadNamesFile if the file does not exist
+    if not os.path.isfile(ReadNamesFile):
+        ExitCode = BlastnProcess.launch(ReadNamesFile)
+    else:
+        logger.warn("%s has already been created, it will be used" %ReadNamesFile )
+        
     StatsDict[i]["BlastTime"] = time.time() - start_blast_time
-    logger.debug("blast --- %s seconds ---" % (StatsDict[(i)]["BlastTime"]))
+    logger.debug("blast --- %s seconds ---" % (StatsDict[i]["BlastTime"]))
     if PairedData:
         # Get paired reads names and remove duplicated names
+        logger.info("Get paired reads names and remove duplicated names")
         ExitCode = ApytramNeeds.add_paired_read_names(ReadNamesFile)
     else:
         # Remove duplicated names
+        logger.info("Remove duplicated names")
         ExitCode = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
-    # Count the number of reads whic will be used in the Trinity assembly
+    # Count the number of reads which will be used in the Trinity assembly
+    logger.info("Count the number of reads")
     StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
+    
     if not StatsDict[i]["ReadsNumber"]:
         logger.error("No read recruted by Blast at the iteration %s" %i)
         Stop = True
@@ -392,9 +425,16 @@ while (i < MaxIteration) and (Stop == False):
             ### Retrieve sequences
 
             logger.info("Retrieve reads sequences")
+            start_blastdbcmd_time = time.time()
             ReadFasta = TmpDirName + "/Reads.%d.fasta" % (i)
             BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
-            BlastdbcmdProcess.launch()
+            if not os.path.isfile(ReadFasta):
+                BlastdbcmdProcess.launch()
+            else:
+                logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
+            
+            StatsDict[i]["BlastTime"] += time.time() - start_blastdbcmd_time
+            logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
 
             ### Launch Trinity
 
@@ -410,10 +450,15 @@ while (i < MaxIteration) and (Stop == False):
             # Use the  --full_cleanup Trinity option to keep only the contig file
             ExitCode = 0
             TrinityProcess.FullCleanup = True
-            ExitCode = TrinityProcess.launch()
+            if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
+                ExitCode = TrinityProcess.launch()
+            else:
+                logger.warn("%s has already been created, it will be used" %(TrinityFasta+".Trinity.fasta") ) 
+
             TrinityFasta = TrinityFasta + ".Trinity.fasta"
             StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
             logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
+            
             if ExitCode != 0: # Trinity found nothing
                 if ExitCode == 2:
                     logger.error("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
@@ -546,30 +591,37 @@ while (i < MaxIteration) and (Stop == False):
                                                          "%s.iter_%d.fasta" %(OutPrefixName,i),
                                                          Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                          Message = "iter_%d." %i)
+                        # Mafft alignment
+                        ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
 
     if IterationNotFinished:
+            logger.debug("Iteration stop before end")
             Reali = i + 1
     else: 
         Reali = i
     
-    NoPythonTime = StatsDict[(Reali)]["BlastTime"] + StatsDict[(Reali)]["TrinityTime"] +\
-                 StatsDict[(Reali)]["MafftTime"] + StatsDict[(Reali)]["Exonerate1Time"] +\
-                 StatsDict[(Reali)]["Exonerate2Time"]
-    StatsDict[(Reali)].update({"IterationTime": time.time() - start_iter_i,
-                                          "CumulTime": time.time() - start_time,
-                                          "PythonTime": time.time() - start_iter_i - NoPythonTime })  
+    NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
+                 StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
+                 StatsDict[Reali]["Exonerate2Time"]
+    StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
+                             "CumulTime": time.time() - start_time,
+                             "PythonTime": time.time() - start_iter_i - NoPythonTime })  
     logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
+    
+    if (time.time() - start_time) > MaxTime and Stop == False:
+        logger.info("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
+        Stop = True
 
 
 
-logger.info("End of Iterations. It takes %s seconds." %(time.time() - start_iter))
+logger.info("End of Iterations. Iterative process takes %s seconds." %(time.time() - start_iter))
 
 if i: #We check that there is at least one iteration with a result
     if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
         start_iter_i = time.time()
         Reali +=1
         #### Final filter which is equivalent at a new iteration
-        StatsDict[Reali] = StatsDict[Reali].copy()
+        StatsDict[Reali] = StatsDict[Reali-1].copy()
         StatsDict[Reali].update({"IterationTime": 0,
                     "CumulTime": 0,
                     "BlastTime": 0,
@@ -628,7 +680,7 @@ if i: #We check that there is at least one iteration with a result
             StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
             logger.debug("mafft --- %s seconds ---" % (StatsDict[Reali]["MafftTime"]))
 
-            NoPythonTime += StatsDict[Reali]["MafftTime"]
+            NoPythonTime += time.time() - start_mafft_time
             StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
                                          "CumulTime": time.time() - start_time,
                                          "PythonTime": time.time() - start_iter_i - NoPythonTime })
