@@ -9,7 +9,7 @@ import subprocess
 class Exonerate:
     """Define an object to launch Exonerate"""
     def __init__(self, TargetFile, QueryFile):
-        self.logger = logging.getLogger('apytram.lib.Exonerate')
+        self.logger = logging.getLogger('apytram.lib.Aligner.Exonerate')
         self.TargetFile = TargetFile
         self.QueryFile = QueryFile
         self.Model = ""
@@ -59,7 +59,7 @@ class Exonerate:
 class Mafft:
     """Define an object to launch Mafft"""
     def __init__(self, InputFile):
-        self.logger = logging.getLogger('apytram.lib.Mafft')
+        self.logger = logging.getLogger('apytram.lib.Aligner.Mafft')
         self.InputFile = InputFile
         self.AddOption = False
         self.AdjustdirectionOption = False

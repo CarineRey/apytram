@@ -8,6 +8,7 @@ import subprocess
 class Makeblastdb:
     """Define an object to create a local database"""
     def __init__(self, InputFile, OutputFiles):
+        self.logger = logging.getLogger('apytram.lib.BlastPlus.Makeblastdb')
         self.Title = ""
         self.InputFile = InputFile
         self.OutputFiles = OutputFiles
@@ -19,7 +20,7 @@ class Makeblastdb:
         ExitCode = 1
         command = ["makeblastdb","-in",self.InputFile,"-out", os.path.abspath(self.OutputFiles),
                    "-dbtype", self.Dbtype ]
-
+        self.logger.debug(" ".join(command))
         if self.IndexedDatabase:
             command.append("-parse_seqids")
         try:
@@ -105,6 +106,7 @@ class Makeblastdb:
 class Blast:
     """Define a object to lauch a blast on a local database"""
     def __init__(self, Program, Database, QueryFile):
+        self.logger = logging.getLogger('apytram.lib.BlastPlus.Blast')
         self.Program = Program
         self.Database = Database
         self.QueryFile = QueryFile
@@ -129,7 +131,8 @@ class Blast:
                 command.extend(["-perc_identity" , str(self.perc_identity)])
             if self.Task:
                 command.extend(["-task",self.Task])
-
+                
+            self.logger.debug(" ".join(command))
             try:
                  ExitCode = subprocess.call(command,
                                        stdout=open("/dev/null", "w"),
@@ -139,7 +142,7 @@ class Blast:
                 print " ".join(command)
             return ExitCode
         else:
-                print "%s not in [blastn,blastx,tblastn,tblastx]" % self.Program
+                self.logger.error("%s not in [blastn,blastx,tblastn,tblastx]" % self.Program)
                 return ExitCode
     
 #USAGE
@@ -427,6 +430,7 @@ class Blast:
 class Blastdbcmd:
     """Define a object to launch blastdbcmd on a local database"""
     def __init__(self, Database, SequenceNamesFile, OutputFile):
+        self.logger = logging.getLogger('apytram.lib.BlastPlus.Blastdbcmd')
         self.InputFile = SequenceNamesFile
         self.Database = Database
         self.OutputFile = OutputFile
@@ -435,7 +439,7 @@ class Blastdbcmd:
     def launch(self):
         command = ["blastdbcmd","-db",self.Database,"-entry_batch", self.InputFile,
                    "-dbtype", self.Dbtype, "-out" , self.OutputFile ]
-        
+        self.logger.debug(" ".join(command))
         try:
             subprocess.call(command,
                             stdout=open("/dev/null", "w"),
