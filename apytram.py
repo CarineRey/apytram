@@ -88,8 +88,8 @@ SearchOptions.add_argument('-e', '--evalue',  type=float,
                     default = 1e-3 )
 
 SearchOptions.add_argument('-id', '--min_id',  type=int,
-                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 20)",
-                    default = 20 )
+                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 60)",
+                    default = 60 )
 SearchOptions.add_argument('-mal', '--min_ali_len',  type=int,
                     help = "Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default = 180 )
@@ -130,6 +130,9 @@ MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
 MiscellaneousOptions.add_argument('-threads',  type=int,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
+MiscellaneousOptions.add_argument('-time_max',  type=int,
+                    help = "Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
+                    default = 7200 )
 ##############
 
 
@@ -148,18 +151,25 @@ args = parser.parse_args()
 
 
 ### Read the arguments
+StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
-Threads = args.threads
+
 Evalue = args.evalue
+
 MinIdentityPercentage = args.min_id
 MinAliLength = args.min_ali_len
 MinLength = args.min_len
+RequiredCoverage = args.required_coverage
+
 FinalMinLength = args.final_min_len
 FinalMinIdentityPercentage = args.final_min_id
 FinalMinAliLength = args.final_min_ali_len
+
 KeepIterations = args.keep_iterations
-RequiredCoverage = args.required_coverage
 FinishAllIter = args.finish_all_iter
+
+Threads = args.threads
+MaxTime = args.time_max
 
 if args.database_type == "paired":
     PairedData = True
@@ -168,8 +178,6 @@ else:
     
 if args.plot:
     args.stats = True
-    
-
 
 ### Set up the log directory
 if args.log:
@@ -282,8 +290,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
         MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
         ExitCode = MakeblastdbProcess.launch()
     else :
-        logger.error("The database is not formatted ! A fasta file (-fa) or a fastq file (-fq) is required !")
-# comm Marie : veux tu dire : the database could not be formatted because a fasta file is required? ou bien mauvais format : There was an error while formatting the database?
+        logger.error("The database could not be formatted because a fasta file (-fa) or a fastq file (-fq) is required!")
         sys.exit(1)
 
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
@@ -552,6 +559,7 @@ while (i < MaxIteration) and (Stop == False):
                     start_mafft_time = time.time()
                     MafftProcess = Aligner.Mafft(QueryFile)
                     MafftProcess.QuietOption = True
+                    MafftProcess.AutoOption = True
                     MafftProcess.AdjustdirectionOption = True
                     MafftProcess.AddOption = FileteredTrinityFasta
                     MafftResult = MafftProcess.get_output()
@@ -672,6 +680,7 @@ if i: #We check that there is at least one iteration with a result
             start_mafft_time = time.time()
             MafftProcess = Aligner.Mafft(QueryFile)
             MafftProcess.QuietOption = True
+            MafftProcess.AutoOption = True
             MafftProcess.AdjustdirectionOption = True
             MafftProcess.AddOption = OutPrefixName+".fasta"
             MafftResult = MafftProcess.get_output()
