@@ -252,7 +252,16 @@ def create_plot_ali(DictPlotCov, OutPrefixName):
                         norm=norm)
     # Format
     fig = plt.gcf()
-    fig.set_size_inches(3+float(df.shape[1])/12, 1+float(df.shape[0])/2)
+    Width = 3+float(df.shape[1])/12
+    Heigth =  1+float(df.shape[0])/2
+
+    # Maximum figure size (pixels)
+    if Width > 32000:
+        Width = 32000
+    if Heigth > 32000:
+        Heigth = 32000
+
+    fig.set_size_inches(Width, Heigth)
     # put the major ticks at the middle of each cell
     plt.yticks(np.arange(len(df.index)) + 0.5, df.index, size = 12)
     ax.xaxis.tick_top()

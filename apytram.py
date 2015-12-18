@@ -638,11 +638,11 @@ if i: #We check that there is at least one iteration with a result
     if args.plot_ali:
         start_output_ali = time.time()
         LengthAlignment = len(DicPlotCov[DicPlotCov.keys()[0]])
-        if LengthAlignment <= 10000:
+        if LengthAlignment <= 3000:
             logger.info("Create plot of the final alignment (OutPrefix.ali.png)")         
             ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
         else:
-            logger.warn("Final alignment is longger than 10000 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
+            logger.warn("Final alignment is longger than 3000 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
         logger.info("Write the final alignment in OutPrefix.ali.fasta")
         ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
         logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
