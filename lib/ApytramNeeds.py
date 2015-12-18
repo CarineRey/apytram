@@ -182,12 +182,12 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
             name = line.split()[0].replace(">","")
             if (Names):
                 if name in Names:
-                    string += ">APYTRAM_%s%d[%s]\n" %(Message,i,df[name]["ti"])
+                    string += ">APYTRAM_%s%d\tlen=%s\t[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
                     i+=1
                 else:
                     name = ""
             else:
-                string += ">APYTRAM_%s%d[%s]\n" %(Message,i,df[name]["ti"])
+                string += ">APYTRAM_%s%d\tlen=%s\t[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
                 i+=1
             
         elif name != "":
