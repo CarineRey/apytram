@@ -494,19 +494,18 @@ while (i < MaxIteration) and (Stop == False):
                 TrinityExonerateFile.write(TrinityExonerateResult)
                 TrinityExonerateFile.close()
                 # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
-                BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
+                BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
                                          minalilength = MinAliLength)
                 StatsDict[i].update(StatsIter)
                 FilteredSequenceNames = TrinityExonerateResultsDict.keys()
                 StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
                 logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
 
-                # Filter the hit
-    # Comm Marie : pas clair vu que tu dis plus haut déjà que tu filtres sur l'identité non?
-
+                # Write filtered sequences in a file
                 logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength)) 
                 FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
-                ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
+                ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta,
+                                                    ReverseNames = ReverseNames)
 
                 ### Validated sequences become bait sequences
 
@@ -517,7 +516,7 @@ while (i < MaxIteration) and (Stop == False):
                     IterationNotFinished = True
                     i -=1
                 else:
-                    ### Compare to the previous iteration
+                    ### Compare sequences of the current iterztion to those of the previous iteration
 
                     logger.info("Compare results with the previous iteration")
 
@@ -560,7 +559,7 @@ while (i < MaxIteration) and (Stop == False):
                     MafftProcess = Aligner.Mafft(QueryFile)
                     MafftProcess.QuietOption = True
                     MafftProcess.AutoOption = True
-                    MafftProcess.AdjustdirectionOption = True
+                    #MafftProcess.AdjustdirectionOption = True
                     MafftProcess.AddOption = FileteredTrinityFasta
                     MafftResult = MafftProcess.get_output()
                     StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
@@ -641,7 +640,7 @@ if i: #We check that there is at least one iteration with a result
                     })
  
         # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
-        BestScoreNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
+        BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
                                          FinalMinIdentityPercentage,
                                          minalilengthpercentage = FinalMinAliLength,
                                          minlengthpercentage = FinalMinLength)
@@ -652,7 +651,8 @@ if i: #We check that there is at least one iteration with a result
         if FilteredSequenceNames: # If sequences pass the last filter
             # Write Filter hit
             FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, Reali+1)
-            ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta)
+            ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames,
+                                                 FileteredTrinityFasta, ReverseNames = ReverseNames)
 
     start_output = time.time()
     if FilteredSequenceNames: # If sequences pass the last filter
@@ -681,13 +681,13 @@ if i: #We check that there is at least one iteration with a result
             MafftProcess = Aligner.Mafft(QueryFile)
             MafftProcess.QuietOption = True
             MafftProcess.AutoOption = True
-            MafftProcess.AdjustdirectionOption = True
+            #MafftProcess.AdjustdirectionOption = True
             MafftProcess.AddOption = OutPrefixName+".fasta"
             MafftResult = MafftProcess.get_output()
             StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
             logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
             StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
-            logger.debug("mafft --- %s seconds ---" % (StatsDict[Reali]["MafftTime"]))
+            logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
 
             NoPythonTime += time.time() - start_mafft_time
             StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,

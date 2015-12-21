@@ -16,6 +16,9 @@ def fastq2fasta(FastqFile,FastaFile):
     os.system(command)
     return ExitCode
 
+def reverse(Sequence):
+    return Sequence[::-1]
+
 def write_in_file(String,Filename,mode = "w"):
     if mode in ["w","a"]:
         File = open(Filename,mode)
@@ -82,6 +85,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
                 }
         
     BestScoreNames = {}
+    ReverseNames = []
     ExonerateResultsDict = {}
     List = ExonerateResult.strip().split("\n")
     
@@ -90,11 +94,18 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
         #TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
         ti = ListLine[0]
         qi = ListLine[1]
-        tal = float(ListLine[3])
-        pi = float(ListLine[8])
-        score = float(ListLine[7])
-        tl = float(ListLine[4])
         ql = float(ListLine[2])
+        tal = float(ListLine[3])
+        tl = float(ListLine[4])
+        tab = float(ListLine[5])
+        tae = float(ListLine[6])
+        qab = float(ListLine[9])
+        qae = float(ListLine[10])
+
+        score = float(ListLine[7])
+        pi = float(ListLine[8])
+
+
         if (pi >=  MinIdentityPercentage) and (tal >= minalilength) and (ql >= minlengthpercentage*tl/100) and (tal >= minalilengthpercentage*tl/100) :
             # We keep this sequence
             if qi not in ExonerateResultsDict.keys():
@@ -113,6 +124,11 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
                 if IterStats["BestScore"] <= score:
                     IterStats["BestScore"] = score
                     BestScoreNames[ti] = qi
+                    
+                # Check if the seqeunce is reverse
+                if ((qae-qab)*(tae-tab) < 0):
+                    ReverseNames.append(qi)
+                    print qi
     
     NbContigs = len(ExonerateResultsDict.keys())
     if NbContigs:
@@ -120,7 +136,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
         IterStats["AverageLength"] = IterStats["TotalLength"] / NbContigs
         IterStats["AverageScore"] = IterStats["TotalScore"] / NbContigs
     
-    return BestScoreNames, ExonerateResultsDict, IterStats
+    return BestScoreNames, ReverseNames, ExonerateResultsDict, IterStats
 
 def check_almost_identical_exonerate_results(ExonerateResult):
     "Return True if all hit have a hit with 99% > id and a len = 98% len query "
@@ -141,7 +157,7 @@ def check_almost_identical_exonerate_results(ExonerateResult):
         Result = True
     return Result 
         
-def filter_fasta(FastaFile, Names, OutFastaFile):
+def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     "Return a fasta file with only sequence in Names"
     File = open(FastaFile,"r")
     Fasta = File.read().strip().split("\n")
@@ -152,15 +168,27 @@ def filter_fasta(FastaFile, Names, OutFastaFile):
     for line in Fasta:
         if re.match(">",line):
             name = line.split()[0].replace(">","")
+            # This is a new sequence write the previous sequence 
+            if sequence:
+                print name
+                if name in ReverseNames:
+                    sequence = reverse(sequence)
+                string += sequence + "\n"
+                sequence = ""
+                
             if name in Names:
                 string += ">%s\n" % name
             else:
                 name = ""
         elif name != "":
-            string += line + "\n"
+            sequence += line + "\n"
         else:
             pass
-    # Write sequences
+    # Write the last sequence    
+    if sequence:
+        string += sequence + "\n"
+                
+    # Write all sequences in the file
     OutFile = open(OutFastaFile,"w")
     OutFile.write(string)
     OutFile.close()        
