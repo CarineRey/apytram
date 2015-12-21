@@ -236,15 +236,27 @@ else:
 
 ### Check that query files exist
 if args.query:
-    if not os.path.isfile(args.query):
-        logger.error(args.query+" (-q) is not a file.")
+    QueryFile = args.query
+    AliQueryFile = args.query
+    if not os.path.isfile(QueryFile):
+        logger.error(QueryFile+" (-q) is not a file.")
         sys.exit(1)
-    elif not os.stat(args.query).st_size:
-        logger.error(args.query+" (-q) is empty.")
+    elif not os.stat(QueryFile).st_size:
+        logger.error(QueryFile+" (-q) is empty.")
         sys.exit(1)
-    elif ApytramNeeds.count_sequences(args.query) !=1:
-        logger.error(args.query+" (-q) contains more than one query.")
-        sys.exit(1)
+    elif ApytramNeeds.count_sequences(QueryFile) !=1:
+        logger.warning(QueryFile+" (-q) contains more than one query.")
+        # If there are multiple probe, align them
+        # Use Mafft
+        start_mafft_time = time.time()
+        MafftProcess = Aligner.Mafft(QueryFile)
+        MafftProcess.QuietOption = True
+        MafftProcess.AutoOption = True
+        MafftResult = MafftProcess.get_output()
+        AliQueryFile = "%s/References.ali.fasta" %TmpDirName
+        ApytramNeeds.write_in_file(MafftResult,AliQueryFile)
+        logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
+
 
 # If the -pep option is used, the -q option must be precised
 if args.query_pep:
@@ -309,7 +321,6 @@ elif not os.path.isfile(args.query):
     logger.error(args.query+" (-q) is not a file.")
     sys.exit(1)
 else:
-    QueryFile = args.query
     logger.info("DB: \"%s\"\tQuery: \"%s\"" %(DatabaseName,QueryFile))
 
 ### Make iterations
@@ -556,7 +567,7 @@ while (i < MaxIteration) and (Stop == False):
                     logger.info("Check that the coverage has inscreased compared to the previous iteration")
                     # Use Mafft
                     start_mafft_time = time.time()
-                    MafftProcess = Aligner.Mafft(QueryFile)
+                    MafftProcess = Aligner.Mafft(AliQueryFile)
                     MafftProcess.QuietOption = True
                     MafftProcess.AutoOption = True
                     #MafftProcess.AdjustdirectionOption = True
@@ -612,7 +623,7 @@ while (i < MaxIteration) and (Stop == False):
                  StatsDict[Reali]["Exonerate2Time"]
     StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
                              "CumulTime": time.time() - start_time,
-                             "PythonTime": time.time() - start_iter_i - NoPythonTime })  
+                             "PythonTime": time.time() - start_iter_i - NoPythonTime })
     logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
     
     if (time.time() - start_time) > MaxTime and Stop == False:
@@ -646,7 +657,7 @@ if i: #We check that there is at least one iteration with a result
                                          minlengthpercentage = FinalMinLength)
         StatsDict[Reali].update(StatsIter)
         FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-        logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
+        logger.info("Filter sequence with a identity percentage superior to %d and a percentage alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
         
         if FilteredSequenceNames: # If sequences pass the last filter
             # Write Filter hit
@@ -678,7 +689,7 @@ if i: #We check that there is at least one iteration with a result
             logger.info("Calculate the final coverage")
             # Use Mafft
             start_mafft_time = time.time()
-            MafftProcess = Aligner.Mafft(QueryFile)
+            MafftProcess = Aligner.Mafft(AliQueryFile)
             MafftProcess.QuietOption = True
             MafftProcess.AutoOption = True
             #MafftProcess.AdjustdirectionOption = True
@@ -689,7 +700,9 @@ if i: #We check that there is at least one iteration with a result
             StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
             logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
 
-            NoPythonTime += time.time() - start_mafft_time
+            NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
+                 StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
+                 StatsDict[Reali]["Exonerate2Time"]
             StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
                                          "CumulTime": time.time() - start_time,
                                          "PythonTime": time.time() - start_iter_i - NoPythonTime })
