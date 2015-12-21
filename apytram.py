@@ -39,7 +39,7 @@ InOptions.add_argument('-fa', '--fasta',  type=str,
 InOptions.add_argument('-fq', '--fastq',  type=str,
                    help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first converted to a fasta file. This process can require some time.")
 InOptions.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the program will just build the database." )
+                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other character than a t g c n (eg. - * . )." )
 InOptions.add_argument('-pep', '--query_pep',  type=str,
                    default = "",       
                    help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
@@ -246,7 +246,7 @@ if args.query:
         sys.exit(1)
     elif ApytramNeeds.count_sequences(QueryFile) !=1:
         logger.warning(QueryFile+" (-q) contains more than one query.")
-        # If there are multiple probe, align them
+        # If there are multiple probes, align them for the future coverage counter
         # Use Mafft
         start_mafft_time = time.time()
         MafftProcess = Aligner.Mafft(QueryFile)
@@ -527,7 +527,7 @@ while (i < MaxIteration) and (Stop == False):
                     IterationNotFinished = True
                     i -=1
                 else:
-                    ### Compare sequences of the current iterztion to those of the previous iteration
+                    ### Compare sequences of the current iteration to those of the previous iteration
 
                     logger.info("Compare results with the previous iteration")
 
@@ -742,4 +742,4 @@ if not args.tmp:
     if "tmp_apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
 
-logger.debug("--- %s seconds ---" % (time.time() - start_time))
+logger.info("--- %s seconds ---" % (time.time() - start_time))
