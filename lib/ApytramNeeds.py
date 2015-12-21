@@ -128,7 +128,6 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
                 # Check if the seqeunce is reverse
                 if ((qae-qab)*(tae-tab) < 0):
                     ReverseNames.append(qi)
-                    print qi
     
     NbContigs = len(ExonerateResultsDict.keys())
     if NbContigs:
@@ -170,7 +169,6 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
             name = line.split()[0].replace(">","")
             # This is a new sequence write the previous sequence 
             if sequence:
-                print name
                 if name in ReverseNames:
                     sequence = reverse(sequence)
                 string += sequence + "\n"
@@ -186,7 +184,10 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
             pass
     # Write the last sequence    
     if sequence:
+        if name in ReverseNames:
+                sequence = reverse(sequence)
         string += sequence + "\n"
+        sequence = ""
                 
     # Write all sequences in the file
     OutFile = open(OutFastaFile,"w")
