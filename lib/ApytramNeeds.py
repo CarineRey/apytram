@@ -17,7 +17,11 @@ def fastq2fasta(FastqFile,FastaFile):
     return ExitCode
 
 def reverse(Sequence):
-    return Sequence[::-1]
+    Reverse = Sequence.replace("\n","")[::-1]
+    Reverse = '\n'.join(Reverse[i:i+70] for i in range(0, len(Reverse), 70))
+    if not re.search("\n$",Reverse):
+        Reverse += "\n"
+    return Reverse
 
 def write_in_file(String,Filename,mode = "w"):
     if mode in ["w","a"]:
