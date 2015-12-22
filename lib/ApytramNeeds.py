@@ -171,7 +171,7 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
             if sequence:
                 if name in ReverseNames:
                     sequence = reverse(sequence)
-                string += sequence + "\n"
+                string += sequence
                 sequence = ""
                 
             if name in Names:
@@ -186,7 +186,7 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     if sequence:
         if name in ReverseNames:
                 sequence = reverse(sequence)
-        string += sequence + "\n"
+        string += sequence
         sequence = ""
                 
     # Write all sequences in the file
