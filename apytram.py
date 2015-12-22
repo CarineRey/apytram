@@ -39,7 +39,7 @@ InOptions.add_argument('-fa', '--fasta',  type=str,
 InOptions.add_argument('-fq', '--fastq',  type=str,
                    help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first converted to a fasta file. This process can require some time.")
 InOptions.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nucl) with bait sequences for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other character than a t g c n (eg. - * . )." )
+                    help = "Fasta file (nucl) with homologous bait sequences which will be treated together for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other characters that a t g c n (eg. - * . )." )
 InOptions.add_argument('-pep', '--query_pep',  type=str,
                    default = "",       
                    help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
@@ -245,7 +245,7 @@ if args.query:
         logger.error(QueryFile+" (-q) is empty.")
         sys.exit(1)
     elif ApytramNeeds.count_sequences(QueryFile) !=1:
-        logger.warning(QueryFile+" (-q) contains more than one query.")
+        logger.warning(QueryFile+" (-q) contains more than one query. They are %s sequences.") %ApytramNeeds.count_sequences(QueryFile)
         # If there are multiple probes, align them for the future coverage counter
         # Use Mafft
         start_mafft_time = time.time()
