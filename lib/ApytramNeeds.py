@@ -1,5 +1,6 @@
 import os
 import re
+import string
 import numpy as np
 import sys
 import subprocess
@@ -16,12 +17,20 @@ def fastq2fasta(FastqFile,FastaFile):
     os.system(command)
     return ExitCode
 
-def reverse(Sequence):
+def reverse_complement(Sequence):
+    intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
+    outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
+    trantab = string.maketrans(intab, outtab)
+    
+    # Reverse
     Reverse = Sequence.replace("\n","")[::-1]
-    Reverse = '\n'.join(Reverse[i:i+70] for i in range(0, len(Reverse), 70))
-    if not re.search("\n$",Reverse):
-        Reverse += "\n"
-    return Reverse
+    # Complement
+    
+    Complement = Reverse.translate(trantab)   
+    Complement = '\n'.join(Complement[i:i+60] for i in range(0, len(Complement), 60))
+    if not re.search("\n$",Complement):
+        Complement += "\n"
+    return Complement
 
 def write_in_file(String,Filename,mode = "w"):
     if mode in ["w","a"]:
@@ -170,14 +179,13 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     string = ""
     for line in Fasta:
         if re.match(">",line):
-            name = line.split()[0].replace(">","")
-            # This is a new sequence write the previous sequence 
+            # This is a new sequence write the previous sequence if it exists
             if sequence:
                 if name in ReverseNames:
-                    sequence = reverse(sequence)
+                    sequence = reverse_complement(sequence)
                 string += sequence
                 sequence = ""
-                
+            name = line.split()[0].replace(">","")
             if name in Names:
                 string += ">%s\n" % name
             else:
@@ -189,7 +197,7 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     # Write the last sequence    
     if sequence:
         if name in ReverseNames:
-                sequence = reverse(sequence)
+            sequence = reverse_complement(sequence)
         string += sequence
         sequence = ""
                 
@@ -215,12 +223,12 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
             name = line.split()[0].replace(">","")
             if (Names):
                 if name in Names:
-                    string += ">APYTRAM_%s%d\tlen=%s\t[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
+                    string += ">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
                     i+=1
                 else:
                     name = ""
             else:
-                string += ">APYTRAM_%s%d\tlen=%s\t[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
+                string += ">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
                 i+=1
             
         elif name != "":

@@ -627,7 +627,7 @@ while (i < MaxIteration) and (Stop == False):
     logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
     
     if (time.time() - start_time) > MaxTime and Stop == False:
-        logger.info("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
+        logger.warn("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
         Stop = True
 
 
@@ -667,6 +667,7 @@ if i: #We check that there is at least one iteration with a result
 
     start_output = time.time()
     if FilteredSequenceNames: # If sequences pass the last filter
+        StatsDict[Reali]["NbContigs"] = len(FilteredSequenceNames)
         #### Write output files
         logger.info("Write outputfiles")
         if not args.no_best_file:
