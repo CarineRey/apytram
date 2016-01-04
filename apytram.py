@@ -245,7 +245,7 @@ if args.query:
         logger.error(QueryFile+" (-q) is empty.")
         sys.exit(1)
     elif ApytramNeeds.count_sequences(QueryFile) !=1:
-        logger.warning(QueryFile+" (-q) contains more than one query. They are %s sequences.") %ApytramNeeds.count_sequences(QueryFile)
+        logger.warning("%s (-q) contains more than one query. They are %s sequences." %(QueryFile,ApytramNeeds.count_sequences(QueryFile)))
         # If there are multiple probes, align them for the future coverage counter
         # Use Mafft
         start_mafft_time = time.time()
