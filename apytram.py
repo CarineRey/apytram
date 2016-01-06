@@ -67,7 +67,7 @@ OutOptions.add_argument('--no_best_file',  action='store_true',
                         default = False,
                         help = "By default, a fasta file (Outprefix.best.fasta) containing only the best sequence is created. If this option is used, it will NOT be created.")
 
-OutOptions.add_argument('--no_last_iter_file',  action='store_true',
+OutOptions.add_argument('--only_best_file',  action='store_true',
                         default = False,
                         help = "By default, a fasta file (Outprefix.fasta) containing all sequences from the last iteration is created. If this option is used, it will NOT be created.")
 
@@ -680,7 +680,7 @@ if i: #We check that there is at least one iteration with a result
                                                          Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                                                          Names = BestScoreNames.values(),
                                                          Message = "best_")
-        if not args.no_last_iter_file:
+        if not args.only_best_file:
             # Last iteration seqeunces
             ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
                                                          TrinityExonerateResultsDict,
