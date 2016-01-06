@@ -3,8 +3,6 @@ import os
 import sys
 import subprocess
 
-## TO DO: check if Exonerate is installed and is path is Exonerate
-
 
 class Exonerate:
     """Define an object to launch Exonerate"""

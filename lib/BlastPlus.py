@@ -3,7 +3,6 @@ import sys
 import logging
 import subprocess
 
-## TO DO: check if blast+ is installed and is path is blast*
 
 class Makeblastdb:
     """Define an object to create a local database"""

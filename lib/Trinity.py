@@ -3,7 +3,6 @@ import sys
 import logging
 import subprocess
 
-## TO DO: check if Trinity is installed and is path is Trinity v2.2>=
 
 class Trinity:
     """Define an object to launch Trinity"""
