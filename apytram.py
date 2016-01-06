@@ -139,6 +139,9 @@ MiscellaneousOptions.add_argument('-time_max',  type=int,
 ### Option parsing
 args = parser.parse_args()
 
+os.system("echo '[Running in process...]\n[Warning messages may print, but they are no error. If real errors appear, the process will stop]'")
+
+
 ## Example for the dev
 #args = parser.parse_args(''' -d example_exec/db/examplefq
 #                             -out Out_test/apytram
