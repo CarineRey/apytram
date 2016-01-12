@@ -479,11 +479,10 @@ while (i < MaxIteration) and (Stop == False):
             TrinityFasta = TrinityFasta + ".Trinity.fasta"
             StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
             logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
-            
-            if ExitCode != 0: # Trinity found nothing
-                if ExitCode == 2:
+            if not os.path.isfile(TrinityFasta): # Trinity found nothing
+                if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                     logger.error("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
-                else:
+                elif ExitCode != 0:
                     logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %ExitCode)
                 Stop = True
                 IterationNotFinished = True
