@@ -7,6 +7,7 @@ import subprocess
 class Trinity:
     """Define an object to launch Trinity"""
     def __init__(self, InputFile, OutputFile):
+        self.logger = logging.getLogger('apytram.lib.Trinity')
         self.seqType = "fa"
         self.max_memory = 1
         self.CPU = 1
@@ -34,7 +35,8 @@ class Trinity:
         
         if self.NoPathMerging:
             command.append("--no_path_merging")
-            
+        
+        self.logger.debug(" ".join(command))
         try:
             ExitCode = subprocess.call(command,
                                        stdout=open("/dev/null", "w"),
