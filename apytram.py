@@ -130,6 +130,9 @@ MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
 MiscellaneousOptions.add_argument('-threads',  type=int,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
+MiscellaneousOptions.add_argument('-memory',  type=float,
+                    help = "Memory available for the assembly in Giga. (Default 1)",
+                    default = 1 )
 MiscellaneousOptions.add_argument('-time_max',  type=int,
                     help = "Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
                     default = 7200 )
@@ -172,6 +175,7 @@ KeepIterations = args.keep_iterations
 FinishAllIter = args.finish_all_iter
 
 Threads = args.threads
+Memory = args.memory
 MaxTime = args.time_max
 
 if args.database_type == "paired":
@@ -464,6 +468,7 @@ while (i < MaxIteration) and (Stop == False):
             TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
             TrinityProcess = Trinity.Trinity(ReadFasta,TrinityFasta)
             TrinityProcess.CPU = Threads
+            TrinityProcess.max_memory = Memory
             # Keep only contig with a length superior to MinLength
             TrinityProcess.MinLength = MinLength
             if PairedData:
