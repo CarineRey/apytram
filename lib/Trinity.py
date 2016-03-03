@@ -22,7 +22,7 @@ class Trinity:
         ExitCode = 0
         command = ["Trinity","--no_version_check","--seqType", self.seqType,"--single", self.InputFile,
                    "--output", self.OutputFile,
-                   "--CPU", str(self.CPU), "--max_memory", str(self.max_memory)+"G"]
+                   "--CPU", str(self.CPU), "--max_memory", str(int(self.max_memory))+"G"]
        
         if self.FullCleanup:
             command.append("--full_cleanup")

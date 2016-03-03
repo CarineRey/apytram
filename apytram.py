@@ -130,7 +130,7 @@ MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
 MiscellaneousOptions.add_argument('-threads',  type=int,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
-MiscellaneousOptions.add_argument('-memory',  type=float,
+MiscellaneousOptions.add_argument('-memory',  type=int,
                     help = "Memory available for the assembly in Giga. (Default 1)",
                     default = 1 )
 MiscellaneousOptions.add_argument('-time_max',  type=int,
@@ -530,7 +530,7 @@ while (i < MaxIteration) and (Stop == False):
                     TrinityExonerateFile.close()
 
                 if not TrinityExonerateResult:
-                    logger.info("Reconstructed sequences but no homologous with references")
+                    logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
                     Stop = True
                     IterationNotFinished = True
                     i -= 1
