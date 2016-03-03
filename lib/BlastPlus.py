@@ -452,6 +452,7 @@ class Blastdbcmd:
     def is_database(self):
         Out = False
         command = ["blastdbcmd","-db",self.Database,"-info"]
+        self.logger.debug(" ".join(command))
         ExitCode = subprocess.call(command,
                                    stdout=open("/dev/null", "w"),
                                    stderr=open("/dev/null", "w"))
