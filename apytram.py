@@ -498,7 +498,7 @@ while (i < MaxIteration) and (Stop == False):
 
                 logger.info("Compare Trinity results with query sequences")
                 # Use Exonerate 
-                TrinityExonerate = "%s/Trinity_iter_%d.exonerate" % (TmpDirName, i)
+                TrinityExonerate = "%s/Trinity_iter_%d.exonerate_cdna2g" % (TmpDirName, i)
                 start_exo_time = time.time()
                 TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
                 # Keep only the best hit for each contig from Trinity 
@@ -511,6 +511,24 @@ while (i < MaxIteration) and (Stop == False):
                 TrinityExonerateFile = open(TrinityExonerate,"w")
                 TrinityExonerateFile.write(TrinityExonerateResult)
                 TrinityExonerateFile.close()
+                if not TrinityExonerateResult:
+                    logger.info("Reconstructed sequences but no homologous with references")
+                    logger.info("Try to get homologies with a more sensible model")
+                    ### Try to get homologies with a more sensible model
+                    TrinityExonerate = "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i)
+                    start_exo_time = time.time()
+                    TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
+                    # Keep only the best hit for each contig from Trinity 
+                    TrinityExonerateProcess.Bestn = 1 
+                    TrinityExonerateProcess.Model = "coding2genome"
+                    # Customize the output format
+                    TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+                    TrinityExonerateResult = TrinityExonerateProcess.get_output()
+                    # Write the result in a file
+                    TrinityExonerateFile = open(TrinityExonerate,"w")
+                    TrinityExonerateFile.write(TrinityExonerateResult)
+                    TrinityExonerateFile.close()
+
                 if not TrinityExonerateResult:
                     logger.info("Reconstructed sequences but no homologous with references")
                     Stop = True
@@ -549,7 +567,7 @@ while (i < MaxIteration) and (Stop == False):
                         logger.info("Check if the number of contigs has changed")
                         StatsDict[i]["NbContigs"] = len(FilteredSequenceNames)
 
-                        if StatsDict[i]["NbContigs"] != StatsDict[(i-1)]["NbContigs"]:
+                        if StatsDict[i]["NbContigs"] != StatsDict[i-1]["NbContigs"]:
                              logger.info("The number of contigs has changed")          
                         elif i >= 2:
                             logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
@@ -593,11 +611,17 @@ while (i < MaxIteration) and (Stop == False):
 
                         if not FinishAllIter:
                             # Stop iteration if both Largecoverage and Total length are not improved
-                            if StatsDict[i]["TotalLength"] > StatsDict[(i-1)]["TotalLength"]:
+                            if StatsDict[i]["AverageLength"] > StatsDict[i-1]["AverageLength"]:
                                 pass
-                            elif StatsDict[i]["TotalScore"] > StatsDict[(i-1)]["TotalScore"]:
+                            elif StatsDict[i]["AverageScore"] > StatsDict[i-1]["AverageScore"]:
                                 pass
-                            elif StatsDict[i]["LargeCoverage"] <= StatsDict[(i-1)]["LargeCoverage"]:
+                            elif StatsDict[i]["TotalLength"] > StatsDict[i-1]["TotalLength"]:
+                                pass
+                            elif StatsDict[i]["TotalScore"] > StatsDict[i-1]["TotalScore"]:
+                                pass
+                            elif StatsDict[i]["BestScore"] > StatsDict[i-1]["BestScore"]:
+                                pass
+                            elif StatsDict[i]["LargeCoverage"] <= StatsDict[i-1]["LargeCoverage"]:
                                 logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
                                 Stop = True
 
