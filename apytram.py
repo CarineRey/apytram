@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # coding: utf-8
 import os
+import re
 import sys
 import time
 import tempfile
@@ -35,9 +36,9 @@ requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["singl
 ##############
 InOptions = parser.add_argument_group('Input Files')
 InOptions.add_argument('-fa', '--fasta',  type=str,
-                   help = "Fasta formated RNA-seq data to build the database of reads")
-InOptions.add_argument('-fq', '--fastq',  type=str,
-                   help = "Fastq formated RNA-seq data to build the database of reads. (The fastq will be first converted to a fasta file. This process can require some time.")
+                   help = "Fasta formated RNA-seq data to build the database of reads (only one file).")
+InOptions.add_argument('-fq', '--fastq',  type=str, nargs='*',
+                   help = "Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
 InOptions.add_argument('-q', '--query',  type=str,
                     help = "Fasta file (nucl) with homologous bait sequences which will be treated together for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other characters that a t g c n (eg. - * . )." )
 InOptions.add_argument('-pep', '--query_pep',  type=str,
@@ -283,16 +284,16 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     #Build blast formated database from a fasta file
     if args.fastq or args.fasta:
         if args.fastq:
-            if not os.path.isfile(args.fastq):
-                logger.error("The fastq file (-fq) does not exist.")
-                sys.exit(1)
-            else:
-                # Format the fastq file in fasta
-                InputFasta = TmpDirName + "/" + os.path.basename(args.fastq) + ".fasta"
-                logger.info("Convert the fastq file in fasta format")
-                start_convert = time.time()
-                ExitCode = ApytramNeeds.fastq2fasta(args.fastq,InputFasta)
-                logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
+			for fastq in args.fastq:
+				if not os.path.isfile(fastq):
+					logger.error("The fastq file (%s) does not exist." %fastq)
+					sys.exit(1)
+			# Format the fastq file in fasta
+			InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
+			logger.info("Convert the fastq file in fasta format")
+			start_convert = time.time()
+			ExitCode = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
+			logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
             InputFasta = args.fasta
             

@@ -13,7 +13,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
-    command = """awk 'NR%%4==1||NR%%4==2' < %s | tr "@" ">" > %s """ %(FastqFile, FastaFile)
+    command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
     os.system(command)
     return ExitCode
 
@@ -21,11 +21,9 @@ def reverse_complement(Sequence):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
     outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
     trantab = string.maketrans(intab, outtab)
-    
     # Reverse
     Reverse = Sequence.replace("\n","")[::-1]
-    # Complement
-    
+    # Complement 
     Complement = Reverse.translate(trantab)   
     Complement = '\n'.join(Complement[i:i+60] for i in range(0, len(Complement), 60))
     if not re.search("\n$",Complement):
