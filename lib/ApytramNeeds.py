@@ -174,34 +174,37 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     File.close()
     name = ""
     sequence = ""
-    string = ""
+    sequence_list = []
+    string_list = []
     for line in Fasta:
         if re.match(">",line):
             # This is a new sequence write the previous sequence if it exists
-            if sequence:
+            if sequence_list:
+                sequence = "".join(sequence_list)
                 if name in ReverseNames:
                     sequence = reverse_complement(sequence)
-                string += sequence
-                sequence = ""
+                string_list.append(sequence)
+                sequence_list = []
             name = line.split()[0].replace(">","")
             if name in Names:
-                string += ">%s\n" % name
+                string_list.append( ">%s\n" % name)
             else:
                 name = ""
         elif name != "":
-            sequence += line + "\n"
+            sequence_list.append(line + "\n")
         else:
             pass
     # Write the last sequence    
-    if sequence:
+    if sequence_list:
+        sequence = "".join(sequence_list)
         if name in ReverseNames:
             sequence = reverse_complement(sequence)
-        string += sequence
-        sequence = ""
+        string_list.append(sequence)
+        sequence_list = []
                 
     # Write all sequences in the file
     OutFile = open(OutFastaFile,"w")
-    OutFile.write(string)
+    OutFile.write("".join(string_list))
     OutFile.close()        
     return 0
 
@@ -213,7 +216,7 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
     File.close()
     name = ""
     sequence = ""
-    string = ""
+    string_list = []
     i = 1
 
     for line in Fasta:
@@ -221,21 +224,21 @@ def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header =
             name = line.split()[0].replace(">","")
             if (Names):
                 if name in Names:
-                    string += ">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
+                    string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
                     i+=1
                 else:
                     name = ""
             else:
-                string += ">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"])
+                string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
                 i+=1
             
         elif name != "":
-            string += line + "\n"
+            string_list.append(line + "\n")
         else:
             pass
     # Write sequences
     OutFile = open(OutFastaFile,"w")
-    OutFile.write(string)
+    OutFile.write("".join(string_list))
     OutFile.close()  
     return 0
 
