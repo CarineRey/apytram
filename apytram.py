@@ -66,24 +66,41 @@ requiredOptions.add_argument('-d', '--database', type=str,
                              help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
 requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
                              help='single or paired end RNA-seq data. WARNING: Paired read names must finished by 1 or 2.', required=True)
+requiredOptions.add_argument('-SS_lib_type', type=str, choices=["single","paired","FR","RF","F","R"],
+                             help="""single: single unstranded data.
+								  paired: paired unstranded data.
+								  RF: paired stranded data (/1 = reverse ; /2 = forward)
+								  FR: paired stranded data (/1 = reverse ; /2 = forward)
+								  F: single stranded data (/1 = forward)
+								  R: single stranded data (/1 = reverse)	
+								  WARNING: Paired read names must finished by 1 or 2""")                             
 ##############
 
 
 ##############
-InOptions = parser.add_argument_group('Input Files')
-InOptions.add_argument('-fa', '--fasta',  type=str,
+InUSOptions = parser.add_argument_group('Input Files')
+InUSOptions.add_argument('-fa', '--fasta',  type=str, nargs='*',
                    help = "Fasta formated RNA-seq data to build the database of reads (only one file).")
-InOptions.add_argument('-fq', '--fastq',  type=str, nargs='*',
+InUSOptions.add_argument('-fq', '--fastq',  type=str, nargs='*',
                    help = "Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
-InOptions.add_argument('-q', '--query',  type=str,
+##############
+
+##############
+QueryOptions = parser.add_argument_group('Query File')
+QueryOptions.add_argument('-q', '--query',  type=str,
                     help = "Fasta file (nucl) with homologous bait sequences which will be treated together for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other characters that a t g c n (eg. - * . )." )
-InOptions.add_argument('-pep', '--query_pep',  type=str,
+QueryOptions.add_argument('-pep', '--query_pep',  type=str,
                    default = "",       
                    help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
-InOptions.add_argument('-i', '--iteration_max',  type=int,
+##############
+
+
+##############
+IterationOptions = parser.add_argument_group('Number of iterations')
+IterationOptions.add_argument('-i', '--iteration_max',  type=int,
                     help = "Maximum number of iterations. (Default 5)",
                     default = 5 )
-InOptions.add_argument('-i_start','--iteration_start',  type=int,
+IterationOptions.add_argument('-i_start','--iteration_start',  type=int,
                     help = "Number of the first iteration. If different of 1, the tmp option must be used. (Default: 1)",
                     default = 1 )
 ##############
@@ -138,7 +155,7 @@ SearchOptions.add_argument('-len', '--min_len',  type=int,
 
 ##############
 StopOptions = parser.add_argument_group('Criteria to stop iteration')
-StopOptions.add_argument('--required_coverage',  type=float,
+StopOptions.add_argument('-required_coverage',  type=float,
                     help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
                     default = 200 )
 StopOptions.add_argument('--finish_all_iter', action='store_true',
@@ -219,6 +236,17 @@ if args.database_type == "paired":
     PairedData = True
 else:
     PairedData = False
+    
+if args.SS_lib_type in ["RF","FR","R","F"]:
+    StrandedData = True
+else:
+    StrandedData = False
+    
+if args.SS_lib_type in ["paired","RF","FR"]:
+     PairedData = True
+else:
+     PairedData = False
+    
     
 if args.plot:
     args.stats = True
@@ -317,7 +345,7 @@ DatabaseName = args.database
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
     logger.info("Database %s does not exist" % DatabaseName)
-    #Build blast formated database from a fasta file
+    #Concatenate input files
     if args.fastq or args.fasta:
         if args.fastq:
 			for fastq in args.fastq:
@@ -331,23 +359,39 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
 			ExitCode = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
 			logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
-            InputFasta = args.fasta
-            
-        if not os.path.isfile(InputFasta):
-            logger.error("The fasta file (-fa) does not exist.")
-            sys.exit(1)
-        if os.path.isdir(os.path.dirname(DatabaseName)):
-            logger.info("Database directory exists")
-        else:
-            logger.info("Database directory does not exist, we create it")
-            os.makedirs(os.path.dirname(DatabaseName))
-        # database building
-        logger.info(DatabaseName + " database building")
-        MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
-        ExitCode = MakeblastdbProcess.launch()
+			for fasta in args.fasta:
+				if not os.path.isfile(fasta):
+					logger.error("The fasta file (%s) does not exist." %fasta)
+					sys.exit(1)
+			# Concatenate fasta files
+			if len(args.fasta) > 1:
+				InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
+				logger.info("Concatenate fasta files")
+				start_convert = time.time()
+				ExitCode = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
+				logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
+			else:
+				InputFasta = args.fasta[0]
+				
     else :
         logger.error("The database could not be formatted because a fasta file (-fa) or a fastq file (-fq) is required!")
         sys.exit(1)
+            
+    print "ok"
+    #Build blast formated database from a fasta file    
+    if not os.path.isfile(InputFasta):
+        logger.error("Error during concatenation or conversion of input files.")
+        sys.exit(1)
+    if os.path.isdir(os.path.dirname(DatabaseName)):
+        logger.info("Database directory exists")
+    else:
+        logger.info("Database directory does not exist, we create it")
+    os.makedirs(os.path.dirname(DatabaseName))
+	
+	# Database building
+    logger.info(DatabaseName + " database building")
+    MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
+    ExitCode = MakeblastdbProcess.launch()
 
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
@@ -502,16 +546,18 @@ while (i < MaxIteration) and (Stop == False):
 
             start_trinity_time = time.time()
             logger.info("Launch Trinity")
+            ExitCode = 0
             TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
-            TrinityProcess = Trinity.Trinity(ReadFasta,TrinityFasta)
+            TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
             TrinityProcess.CPU = Threads
             TrinityProcess.max_memory = Memory
             # Keep only contig with a length superior to MinLength
             TrinityProcess.MinLength = MinLength
+            TrinityProcess.NormalizeReads = True
             if PairedData:
                 TrinityProcess.Paired = True
             # Use the  --full_cleanup Trinity option to keep only the contig file
-            ExitCode = 0
+
             TrinityProcess.FullCleanup = True
             if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
                 ExitCode = TrinityProcess.launch()

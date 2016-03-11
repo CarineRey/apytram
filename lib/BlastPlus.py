@@ -54,9 +54,10 @@ class Makeblastdb:
         ExitCode = 1
         command = ["makeblastdb","-in",self.InputFile,"-out", os.path.abspath(self.OutputFiles),
                    "-dbtype", self.Dbtype ]
-        self.logger.debug(" ".join(command))
         if self.IndexedDatabase:
             command.append("-parse_seqids")
+        
+        self.logger.debug(" ".join(command))
         try:
             ExitCode = subprocess.call(command,
                                        stdout=open("/dev/null", "w"),

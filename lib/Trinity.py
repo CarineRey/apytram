@@ -41,18 +41,22 @@ import subprocess
 
 class Trinity:
     """Define an object to launch Trinity"""
-    def __init__(self, InputFile, OutputFile):
+    def __init__(self, OutputFile, single = "", left = "", right = ""):
         self.logger = logging.getLogger('apytram.lib.Trinity')
         self.seqType = "fa"
         self.max_memory = 1
         self.CPU = 1
-        self.InputFile = InputFile
+        self.InputFile = single
         self.OutputFile = OutputFile
+        self.RightFastq = right
+        self.LeftFastq = left
         self.MinLength = 200
         self.Paired = False
         self.FullCleanup = False
         self.NoPathMerging = False
-
+        self.NormalizeReads = False
+        self.SS_lib_type = ""
+		
     def launch(self):
         ExitCode = 0
         command = ["Trinity","--no_version_check","--seqType", self.seqType,"--single", self.InputFile,
@@ -70,6 +74,12 @@ class Trinity:
         
         if self.NoPathMerging:
             command.append("--no_path_merging")
+            
+        if self.NoPathMerging:
+            command.append("--normalize_reads")
+            
+        if self.SS_lib_type in ["FR","RF","F","R"]:
+			command.extend(["--SS_lib_type",self.SS_lib_type])
         
         self.logger.debug(" ".join(command))
         try:

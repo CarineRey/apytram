@@ -76,7 +76,6 @@ class Exonerate:
                                          stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error when we launch Exonerate:\n")
-            print " ".join(command)
 
         # Remove Exonerate default lines (First, second (which contains Hostname) and last):
         List = Out.strip().split("\n")
@@ -120,7 +119,6 @@ class Mafft:
                                           stderr=open("/dev/null", "w"))
         except:
             os.system("echo Unexpected error when we launch Mafft:\n")
-            print " ".join(command)
             
         return Out
 

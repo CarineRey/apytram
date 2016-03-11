@@ -50,9 +50,15 @@ from matplotlib.backends.backend_pdf import PdfPages
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
     command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
-    os.system(command)
+    ExitCode = os.system(command)
     return ExitCode
 
+def cat_fasta(FastaFiles,CatFastaFile):
+    ExitCode = 1
+    command = """cat %s > %s""" %(FastaFiles, CatFastaFile)
+    ExitCode = os.system(command)
+    return ExitCode
+    
 def reverse_complement(Sequence):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
     outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
