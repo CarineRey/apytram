@@ -68,12 +68,12 @@ requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["singl
                              help='single or paired end RNA-seq data. WARNING: Paired read names must finished by 1 or 2.', required=True)
 requiredOptions.add_argument('-SS_lib_type', type=str, choices=["single","paired","FR","RF","F","R"],
                              help="""single: single unstranded data.
-								  paired: paired unstranded data.
-								  RF: paired stranded data (/1 = reverse ; /2 = forward)
-								  FR: paired stranded data (/1 = reverse ; /2 = forward)
-								  F: single stranded data (/1 = forward)
-								  R: single stranded data (/1 = reverse)	
-								  WARNING: Paired read names must finished by 1 or 2""")                             
+                                  paired: paired unstranded data.
+                                  RF: paired stranded data (/1 = reverse ; /2 = forward)
+                                  FR: paired stranded data (/2 = reverse ; /1 = forward)
+                                  F: single stranded data (/1 = forward)
+                                  R: single stranded data (/1 = reverse)	
+                                  WARNING: Paired read names must finished by 1 or 2""")                             
 ##############
 
 
@@ -348,36 +348,35 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     #Concatenate input files
     if args.fastq or args.fasta:
         if args.fastq:
-			for fastq in args.fastq:
-				if not os.path.isfile(fastq):
-					logger.error("The fastq file (%s) does not exist." %fastq)
-					sys.exit(1)
-			# Format the fastq file in fasta
-			InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
-			logger.info("Convert the fastq file in fasta format")
-			start_convert = time.time()
-			ExitCode = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
-			logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
+            for fastq in args.fastq:
+                if not os.path.isfile(fastq):
+                    logger.error("The fastq file (%s) does not exist." %fastq)
+                    sys.exit(1)
+                # Format the fastq file in fasta
+            InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
+            logger.info("Convert the fastq file in fasta format")
+            start_convert = time.time()
+            ExitCode = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
+            logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
-			for fasta in args.fasta:
-				if not os.path.isfile(fasta):
-					logger.error("The fasta file (%s) does not exist." %fasta)
-					sys.exit(1)
-			# Concatenate fasta files
-			if len(args.fasta) > 1:
-				InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
-				logger.info("Concatenate fasta files")
-				start_convert = time.time()
-				ExitCode = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
-				logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
-			else:
-				InputFasta = args.fasta[0]
-				
+            for fasta in args.fasta:
+                if not os.path.isfile(fasta):
+                    logger.error("The fasta file (%s) does not exist." %fasta)
+                    sys.exit(1)
+                # Concatenate fasta files
+            if len(args.fasta) > 1:
+                InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
+                logger.info("Concatenate fasta files")
+                start_convert = time.time()
+                ExitCode = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
+                logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
+            else:
+                InputFasta = args.fasta[0]
+                
     else :
         logger.error("The database could not be formatted because a fasta file (-fa) or a fastq file (-fq) is required!")
         sys.exit(1)
             
-    print "ok"
     #Build blast formated database from a fasta file    
     if not os.path.isfile(InputFasta):
         logger.error("Error during concatenation or conversion of input files.")
@@ -386,16 +385,16 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
         logger.info("Database directory exists")
     else:
         logger.info("Database directory does not exist, we create it")
-    os.makedirs(os.path.dirname(DatabaseName))
-	
-	# Database building
+        os.makedirs(os.path.dirname(DatabaseName))
+    
+    # Database building
     logger.info(DatabaseName + " database building")
     MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
     ExitCode = MakeblastdbProcess.launch()
 
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
-    logger.error("Problem in the database building")
+    logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
     logger.info("Database %s does not exist" % DatabaseName)
     sys.exit(1)
 else:
@@ -509,6 +508,7 @@ while (i < MaxIteration) and (Stop == False):
         # Remove duplicated names
         logger.info("Remove duplicated names")
         ExitCode = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
+    
     # Count the number of reads which will be used in the Trinity assembly
     logger.info("Count the number of reads")
     StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
@@ -530,14 +530,35 @@ while (i < MaxIteration) and (Stop == False):
 
             ### Retrieve sequences
 
-            logger.info("Retrieve reads sequences")
-            start_blastdbcmd_time = time.time()
-            ReadFasta = TmpDirName + "/Reads.%d.fasta" % (i)
-            BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
-            if not os.path.isfile(ReadFasta):
-                BlastdbcmdProcess.launch()
-            else:
-                logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
+            logger.info("Split read names depending on 1/ or 2/")
+            if args.SS_lib_type in ["RF","FR"]:
+                ReadNamesFile_Right = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,".1")
+                ReadNamesFile_Left = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,".2")
+                ReadFasta_Right = "%s/Reads.%d.%d.fasta" % (TmpDirName,i,1)
+                ReadFasta_Left = "%s/Reads.%d.%d.fasta" % (TmpDirName,i,2)
+                
+                ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
+                logger.info("Retrieve reads sequences")
+                start_blastdbcmd_time = time.time()
+                StrandList = [".1",".2"]
+                for strand in StrandList:
+                    ReadFasta = TmpDirName + "/Reads.%d%s.fasta" % (i,strand)
+                    ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
+                    BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
+                    if not os.path.isfile(ReadFasta):
+                        BlastdbcmdProcess.launch()
+                    else:
+                        logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
+                    
+            else:    
+                logger.info("Retrieve reads sequences")    
+                start_blastdbcmd_time = time.time()
+                ReadFasta = TmpDirName + "/Reads.%d.fasta" % (i)
+                BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
+                if not os.path.isfile(ReadFasta):
+                    BlastdbcmdProcess.launch()
+                else:
+                    logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
             
             StatsDict[i]["BlastTime"] += time.time() - start_blastdbcmd_time
             logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
@@ -548,16 +569,27 @@ while (i < MaxIteration) and (Stop == False):
             logger.info("Launch Trinity")
             ExitCode = 0
             TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
-            TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
+            if StrandedData:
+                if args.SS_lib_type in ["RF","FR"]:
+                    TrinityProcess = Trinity.Trinity(TrinityFasta, right = ReadFasta_Right,
+                                                    left = ReadFasta_Left)
+                else:
+                    TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
+                TrinityProcess.SS_lib_type = args.SS_lib_type
+            else:
+                TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
+                if PairedData:
+                    TrinityProcess.RunAsPaired = True
+            # If there is a huge number of reads, remove duplicated reads
+            if StatsDict[i]["ReadsNumber"] > 1000:
+                TrinityProcess.NormalizeReads
+                
             TrinityProcess.CPU = Threads
             TrinityProcess.max_memory = Memory
             # Keep only contig with a length superior to MinLength
             TrinityProcess.MinLength = MinLength
-            TrinityProcess.NormalizeReads = True
-            if PairedData:
-                TrinityProcess.Paired = True
-            # Use the  --full_cleanup Trinity option to keep only the contig file
 
+            # Use the  --full_cleanup Trinity option to keep only the contig file
             TrinityProcess.FullCleanup = True
             if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
                 ExitCode = TrinityProcess.launch()

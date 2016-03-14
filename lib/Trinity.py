@@ -46,20 +46,20 @@ class Trinity:
         self.seqType = "fa"
         self.max_memory = 1
         self.CPU = 1
-        self.InputFile = single
+        self.SingleInputFile = single
         self.OutputFile = OutputFile
-        self.RightFastq = right
-        self.LeftFastq = left
+        self.RightInputFile = right
+        self.LeftInputFile = left
         self.MinLength = 200
-        self.Paired = False
+        self.RunAsPaired = False
         self.FullCleanup = False
         self.NoPathMerging = False
         self.NormalizeReads = False
         self.SS_lib_type = ""
-		
+    
     def launch(self):
         ExitCode = 0
-        command = ["Trinity","--no_version_check","--seqType", self.seqType,"--single", self.InputFile,
+        command = ["Trinity","--no_version_check","--seqType", self.seqType,
                    "--output", self.OutputFile,
                    "--CPU", str(self.CPU), "--max_memory", str(int(self.max_memory))+"G"]
        
@@ -68,18 +68,27 @@ class Trinity:
             
         if self.MinLength != 200:
             command.extend(["--min_contig_length",str(self.MinLength)])
-        
-        if self.Paired:
+            
+        if self.SingleInputFile:
+            command.extend(["--single",self.SingleInputFile])
+            
+        if self.RightInputFile:
+            command.extend(["--right",self.RightInputFile])  
+            
+        if self.LeftInputFile:
+            command.extend(["--left",self.LeftInputFile])  
+            
+        if self.RunAsPaired:
             command.append("--run_as_paired")
         
         if self.NoPathMerging:
             command.append("--no_path_merging")
             
-        if self.NoPathMerging:
+        if self.NormalizeReads:
             command.append("--normalize_reads")
             
         if self.SS_lib_type in ["FR","RF","F","R"]:
-			command.extend(["--SS_lib_type",self.SS_lib_type])
+            command.extend(["--SS_lib_type",self.SS_lib_type])
         
         self.logger.debug(" ".join(command))
         try:

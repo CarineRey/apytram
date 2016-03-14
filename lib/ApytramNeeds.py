@@ -96,12 +96,16 @@ def remove_duplicated_read_names(File):
         os.system(command2)
     return 0
 
-def count_lines(File):
+def count_lines(Files):
     Number = 0
-    if os.path.isfile(File):
-        Exit = subprocess.check_output(["wc", "-l", File])  
-        Number = Exit.split(" ")[0]
-    return int(Number)
+    if type(Files) != type([]):
+        Files = [Files]
+        
+    for File in Files:
+        if os.path.isfile(File):
+            Exit = subprocess.check_output(["wc", "-l", File])  
+            Number += int(Exit.split(" ")[0])
+    return Number
 
 def count_sequences(File):
     Number = 0
@@ -109,6 +113,11 @@ def count_sequences(File):
         Exit = subprocess.check_output(["grep \"^>\" %s | wc -l" %File], shell=True) 
         Number = Exit.replace("\n","")
     return int(Number)
+
+def split_readnames_in_right_left(File,Right,Left):
+    if os.path.isfile(File):     
+        command1 = """awk '{if (match($0,"1$")) print > "%s"; else print > "%s"}' %s""" %(Right,Left,File)
+        os.system(command1)
 
 def are_identical(File1,File2):
     Identical = False
