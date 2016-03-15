@@ -50,14 +50,22 @@ from matplotlib.backends.backend_pdf import PdfPages
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
     command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
-    ExitCode = os.system(command)
-    return ExitCode
+    p = subprocess.Popen(command,
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.PIPE,
+                          shell = True)
+    out, err = p.communicate()
+    return (out, err)
 
 def cat_fasta(FastaFiles,CatFastaFile):
     ExitCode = 1
     command = """cat %s > %s""" %(FastaFiles, CatFastaFile)
-    ExitCode = os.system(command)
-    return ExitCode
+    p = subprocess.Popen(command,
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.PIPE,
+                          shell = True)
+    out, err = p.communicate()
+    return (out, err)
     
 def reverse_complement(Sequence):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
@@ -83,18 +91,36 @@ def add_paired_read_names(File):
     if os.path.isfile(File):
         command1 = """awk '{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}' %s  | sort -u > %s """ %(File, File+".paired")
         command2 = "mv %s %s" %(File+".paired", File)
-        os.system(command1)
-        os.system(command2)
-    return 0
+    p1 = subprocess.Popen(command1,
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.PIPE,
+                          shell = True)
+    out1, err1 = p1.communicate()
+    p2 = subprocess.Popen(command1,
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.PIPE,
+                          shell = True)
+    out2, err2 = p2.communicate()
+    return (out1+"\n"+out2, err1+"\n"+err2)
 
 def remove_duplicated_read_names(File):
     "remove duplicated read names"
     if os.path.isfile(File):
         command1 = """sort -u %s > %s""" %(File, File+".uniq")
         command2 = "mv %s %s" %(File+".uniq", File)
-        os.system(command1)
-        os.system(command2)
-    return 0
+        p1 = subprocess.Popen(command1,
+                              stdout = subprocess.PIPE,
+                              stderr = subprocess.PIPE,
+                              shell = True)
+        out1, err1 = p1.communicate()
+        p2 = subprocess.Popen(command1,
+                              stdout = subprocess.PIPE,
+                              stderr = subprocess.PIPE,
+                              shell = True)
+        out2, err2 = p2.communicate()
+        return (out1+"\n"+out2, err1+"\n"+err2)
+    else:
+        return ("","File %s is not a valid path" %File)
 
 def count_lines(Files):
     Number = 0
@@ -116,8 +142,15 @@ def count_sequences(File):
 
 def split_readnames_in_right_left(File,Right,Left):
     if os.path.isfile(File):     
-        command1 = """awk '{if (match($0,"1$")) print > "%s"; else print > "%s"}' %s""" %(Right,Left,File)
-        os.system(command1)
+        command = """awk '{if (match($0,"1$")) print > "%s"; else print > "%s"}' %s""" %(Right,Left,File)
+        p = subprocess.Popen(command,
+                              stdout = subprocess.PIPE,
+                              stderr = subprocess.PIPE,
+                              shell = True)
+        out, err = p.communicate()
+        return (out, err)
+    else:
+        return("","File %s is not a valid path" %File)
 
 def check_paired_data(FastaFile):
     BadReadName = ""

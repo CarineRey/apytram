@@ -340,7 +340,10 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
             InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
             logger.info("Convert the fastq file in fasta format")
             start_convert = time.time()
-            ExitCode = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
+            out,err = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
+            if err:
+                logger.error(err)
+                sys.exit(1)
             logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
             for fasta in args.fasta:
@@ -352,7 +355,10 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
                 logger.info("Concatenate fasta files")
                 start_convert = time.time()
-                ExitCode = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
+                out,err = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
+                if err:
+                    logger.error(err)
+                    sys.exit(1)
                 logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
             else:
                 InputFasta = args.fasta[0]
@@ -452,7 +458,7 @@ if StartIteration != 1 :
 while (i < MaxIteration) and (Stop == False):
     start_iter_i = time.time()
     i += 1
-    StatsDict[i] = StatsDict[(i-1)].copy()
+    StatsDict[i] = StatsDict[i-1].copy()
     StatsDict[i].update({"IterationTime": 0,
                 "CumulTime": 0,
                 "BlastTime": 0,
@@ -497,7 +503,9 @@ while (i < MaxIteration) and (Stop == False):
     else:
         # Remove duplicated names
         logger.info("Remove duplicated names")
-        ExitCode = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
+        out, err = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
+        if err:
+            logger.error(err)
     
     # Count the number of reads which will be used in the Trinity assembly
     logger.info("Count the number of reads")
@@ -526,7 +534,9 @@ while (i < MaxIteration) and (Stop == False):
                 ReadNamesFile_Left = "%s/ReadNames.%d.2.txt" % (TmpDirName,i)
                 ReadFasta_Right = "%s/Reads.%d.1.fasta" % (TmpDirName,i)
                 ReadFasta_Left = "%s/Reads.%d.2.fasta" % (TmpDirName,i)                
-                ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
+                out, err = ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
+                if err:
+                    logger.error(err)
                 StrandList = [".1",".2"]              
             else:
                 StrandList = [""] 
@@ -583,10 +593,11 @@ while (i < MaxIteration) and (Stop == False):
             StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
             logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
             if not os.path.isfile(TrinityFasta): # Trinity found nothing
-                logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                 if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
-                    logger.error("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
+                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-5:]))
+                    logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
                 elif ExitCode != 0:
+                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                     logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %ExitCode)
                 Stop = True
                 IterationNotFinished = True
