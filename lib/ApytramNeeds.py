@@ -126,10 +126,10 @@ def check_paired_data(FastaFile):
         Exit = subprocess.check_output(["grep", "-e", "^>",FastaFile, "-m", "100"])
         Exit2 = subprocess.check_output(["tail %s -n 200 | grep -e \"^>\"" %FastaFile], shell=True)
         ReadNames = (Exit+Exit2).strip().split("\n")
-        while Res and ReadNames:
+        while (not BadReadName) and ReadNames:
             ReadName = ReadNames.pop()
             if not re.search("[12]$",ReadName):
-                BadReadName = ReadName
+                BadReadName = ReadName[1:]
     return BadReadName
 
 def are_identical(File1,File2):
