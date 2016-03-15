@@ -71,21 +71,24 @@ class Exonerate:
             command.extend(["--exhaustive","T"])
         
         self.logger.debug(" ".join(command))
-        try:
-            Out = subprocess.check_output(command,
-                                         stderr=open("/dev/null", "w"))
-        except:
-            os.system("echo Unexpected error when we launch Exonerate:\n")
-
+        p = subprocess.Popen(command,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        if err:
+            self.logger.error("Unexpected error when we launch Exonerate:\n")
+            self.logger.error(err)
+            return (out,err,"")
+            
         # Remove Exonerate default lines (First, second (which contains Hostname) and last):
-        List = Out.strip().split("\n")
+        List = out.strip().split("\n")
         Start = 0
         while not "Hostname" in List[Start]:
             Start += 1
             
-        Out = "\n".join(List[Start+1:-1])
+        ExonerateResults = "\n".join(List[Start+1:-1])
         
-        return Out
+        return (out,err,ExonerateResults)
 
 
 class Mafft:
@@ -99,7 +102,6 @@ class Mafft:
         self.QuietOption = False
         
     def get_output(self):
-        Out = ""
         command = ["mafft"]
 
         if self.AdjustdirectionOption:
@@ -114,13 +116,16 @@ class Mafft:
         
         command.append(self.InputFile)
         self.logger.debug(" ".join(command))
-        try:
-            Out = subprocess.check_output(command,
-                                          stderr=open("/dev/null", "w"))
-        except:
-            os.system("echo Unexpected error when we launch Mafft:\n")
-            
-        return Out
+        p = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        if err:
+            self.logger.error("Unexpected error when we launch Mafft:\n")
+            self.logger.error(err)
+            out = ""   
+           
+        return (out,err)
 
 
     

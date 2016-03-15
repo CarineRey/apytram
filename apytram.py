@@ -308,7 +308,7 @@ if args.query:
         MafftProcess = Aligner.Mafft(QueryFile)
         MafftProcess.QuietOption = True
         MafftProcess.AutoOption = True
-        MafftResult = MafftProcess.get_output()
+        (MafftResult, err) = MafftProcess.get_output()
         AliQueryFile = "%s/References.ali.fasta" %TmpDirName
         ApytramNeeds.write_in_file(MafftResult,AliQueryFile)
         logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
@@ -575,7 +575,7 @@ while (i < MaxIteration) and (Stop == False):
             # Use the  --full_cleanup Trinity option to keep only the contig file
             TrinityProcess.FullCleanup = True
             if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
-                ExitCode = TrinityProcess.launch()
+                (out,err,ExitCode) = TrinityProcess.launch()
             else:
                 logger.warn("%s has already been created, it will be used" %(TrinityFasta+".Trinity.fasta") ) 
 
@@ -583,6 +583,7 @@ while (i < MaxIteration) and (Stop == False):
             StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
             logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
             if not os.path.isfile(TrinityFasta): # Trinity found nothing
+                logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                 if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                     logger.error("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
                 elif ExitCode != 0:
@@ -604,7 +605,7 @@ while (i < MaxIteration) and (Stop == False):
                 TrinityExonerateProcess.Model = "cdna2genome"
                 # Customize the output format
                 TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                TrinityExonerateResult = TrinityExonerateProcess.get_output()
+                (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
                 # Write the result in a file
                 TrinityExonerateFile = open(TrinityExonerate,"w")
                 TrinityExonerateFile.write(TrinityExonerateResult)
@@ -621,7 +622,7 @@ while (i < MaxIteration) and (Stop == False):
                     TrinityExonerateProcess.Model = "coding2genome"
                     # Customize the output format
                     TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                    TrinityExonerateResult = TrinityExonerateProcess.get_output()
+                    (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
                     # Write the result in a file
                     TrinityExonerateFile = open(TrinityExonerate,"w")
                     TrinityExonerateFile.write(TrinityExonerateResult)
@@ -680,7 +681,7 @@ while (i < MaxIteration) and (Stop == False):
                             ExonerateProcess.Model =  "est2genome"
                             # Customize the output format
                             ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
-                            ExonerateResult = ExonerateProcess.get_output()
+                            (out,err,ExonerateResult) = ExonerateProcess.get_output()
                             ExonerateFile = open(Exonerate,"w")
                             ExonerateFile.write(ExonerateResult)
                             ExonerateFile.close()
@@ -701,7 +702,7 @@ while (i < MaxIteration) and (Stop == False):
                         MafftProcess.AutoOption = True
                         #MafftProcess.AdjustdirectionOption = True
                         MafftProcess.AddOption = FileteredTrinityFasta
-                        MafftResult = MafftProcess.get_output()
+                        (MafftResult,err) = MafftProcess.get_output()
                         StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
                         logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"]))
                         StatsDict[i]["MafftTime"] = time.time() - start_mafft_time
@@ -830,7 +831,7 @@ if i: #We check that there is at least one iteration with a result
             MafftProcess.AutoOption = True
             #MafftProcess.AdjustdirectionOption = True
             MafftProcess.AddOption = OutPrefixName+".fasta"
-            MafftResult = MafftProcess.get_output()
+            (MafftResult,err) = MafftProcess.get_output()
             StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
             logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
             StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
