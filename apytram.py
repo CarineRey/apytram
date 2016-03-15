@@ -380,7 +380,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     # Database building
     logger.info(DatabaseName + " database building")
     MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
-    ExitCode = MakeblastdbProcess.launch()
+    out,err = MakeblastdbProcess.launch()
 
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
@@ -484,7 +484,7 @@ while (i < MaxIteration) and (Stop == False):
 
     # Write read names in ReadNamesFile if the file does not exist
     if not os.path.isfile(ReadNamesFile):
-        ExitCode = BlastnProcess.launch(ReadNamesFile)
+        (out,err) = BlastnProcess.launch(ReadNamesFile)
     else:
         logger.warn("%s has already been created, it will be used" %ReadNamesFile )
         
@@ -538,7 +538,7 @@ while (i < MaxIteration) and (Stop == False):
                 ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
                 BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
                 if not os.path.isfile(ReadFasta):
-                    BlastdbcmdProcess.launch()
+                    (out,err) = BlastdbcmdProcess.launch()
                 else:
                     logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
                         
