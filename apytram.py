@@ -142,8 +142,8 @@ SearchOptions.add_argument('-e', '--evalue',  type=float,
                     default = 1e-3 )
 
 SearchOptions.add_argument('-id', '--min_id',  type=int,
-                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 60)",
-                    default = 60 )
+                    help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 50)",
+                    default = 50 )
 SearchOptions.add_argument('-mal', '--min_ali_len',  type=int,
                     help = "Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default = 180 )
@@ -504,7 +504,7 @@ while (i < MaxIteration) and (Stop == False):
         # Remove duplicated names
         logger.info("Remove duplicated names")
         out, err = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
-        if err:
+        if err != "\n":
             logger.error(err)
     
     # Count the number of reads which will be used in the Trinity assembly
