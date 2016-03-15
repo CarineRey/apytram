@@ -119,6 +119,19 @@ def split_readnames_in_right_left(File,Right,Left):
         command1 = """awk '{if (match($0,"1$")) print > "%s"; else print > "%s"}' %s""" %(Right,Left,File)
         os.system(command1)
 
+def check_paired_data(FastaFile):
+    BadReadName = ""
+    if os.path.isfile(FastaFile):
+        #Check First sequence name end with 1/ or 2/
+        Exit = subprocess.check_output(["grep", "-e", "^>",FastaFile, "-m", "100"])
+        Exit2 = subprocess.check_output(["tail %s -n 200 | grep -e \"^>\"" %FastaFile], shell=True)
+        ReadNames = (Exit+Exit2).strip().split("\n")
+        while Res and ReadNames:
+            ReadName = ReadNames.pop()
+            if not re.search("[12]$",ReadName):
+                BadReadName = ReadName
+    return BadReadName
+
 def are_identical(File1,File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):

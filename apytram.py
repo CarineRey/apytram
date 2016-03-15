@@ -64,16 +64,16 @@ parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', type=str,
                              help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
-requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired"],
-                             help='single or paired end RNA-seq data. WARNING: Paired read names must finished by 1 or 2.', required=True)
-requiredOptions.add_argument('-SS_lib_type', type=str, choices=["single","paired","FR","RF","F","R"],
-                             help="""single: single unstranded data.
-                                  paired: paired unstranded data.
+requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single","paired","FR","RF","F","R"],
+                             help="""
+                                  single: single unstranded data ______________________
+                                  paired: paired unstranded data ______________________
                                   RF: paired stranded data (/1 = reverse ; /2 = forward)
                                   FR: paired stranded data (/2 = reverse ; /1 = forward)
-                                  F: single stranded data (/1 = forward)
-                                  R: single stranded data (/1 = reverse)	
-                                  WARNING: Paired read names must finished by 1 or 2""")                             
+                                  F: single stranded data (reads = forward) ____________
+                                  R: single stranded data (reads = reverse) ____________
+                                  WARNING: Paired read names must finished by 1 or 2""",
+                            required=True)       
 ##############
 
 
@@ -199,17 +199,6 @@ args = parser.parse_args()
 os.system("echo '[Running in process...]\n[Warning messages may print, but they are no error. If real errors appear, the process will stop]'")
 
 
-## Example for the dev
-#args = parser.parse_args(''' -d example_exec/db/examplefq
-#                             -out Out_test/apytram
-#                             -fq example/example_db.fastq
-#                            -q example/ref_gene.fasta 
-#                             --database_type paired
-#                             --keep_iterations
-#                             --plot
-#                             -i 5'''.split())
-
-
 ### Read the arguments
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
@@ -232,17 +221,12 @@ Threads = args.threads
 Memory = args.memory
 MaxTime = args.time_max
 
-if args.database_type == "paired":
-    PairedData = True
-else:
-    PairedData = False
-    
-if args.SS_lib_type in ["RF","FR","R","F"]:
+if args.database_type in ["RF","FR","R","F"]:
     StrandedData = True
 else:
     StrandedData = False
     
-if args.SS_lib_type in ["paired","RF","FR"]:
+if args.database_type in ["paired","RF","FR"]:
      PairedData = True
 else:
      PairedData = False
@@ -374,10 +358,16 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 InputFasta = args.fasta[0]
                 
     else :
-        logger.error("The database could not be formatted because a fasta file (-fa) or a fastq file (-fq) is required!")
+        logger.error("The database could not be formatted because fasta files (-fa) or fastq files (-fq) are required!")
         sys.exit(1)
-            
-    #Build blast formated database from a fasta file    
+    
+    #Check if the end of sequence name of paired data are 1 or 2
+    if PairedData:
+        BadReadName = ApytramNeeds.check_paired_data(InputFasta)
+        if BadReadName:
+            logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %BadReadName)
+            sys.exit(1)
+    #Build blast formated database from a fasta file
     if not os.path.isfile(InputFasta):
         logger.error("Error during concatenation or conversion of input files.")
         sys.exit(1)
@@ -531,34 +521,27 @@ while (i < MaxIteration) and (Stop == False):
             ### Retrieve sequences
 
             logger.info("Split read names depending on 1/ or 2/")
-            if args.SS_lib_type in ["RF","FR"]:
-                ReadNamesFile_Right = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,".1")
-                ReadNamesFile_Left = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,".2")
-                ReadFasta_Right = "%s/Reads.%d.%d.fasta" % (TmpDirName,i,1)
-                ReadFasta_Left = "%s/Reads.%d.%d.fasta" % (TmpDirName,i,2)
-                
+            if args.database_type in ["RF","FR"]:
+                ReadNamesFile_Right = "%s/ReadNames.%d.1.txt" % (TmpDirName,i)
+                ReadNamesFile_Left = "%s/ReadNames.%d.2.txt" % (TmpDirName,i)
+                ReadFasta_Right = "%s/Reads.%d.1.fasta" % (TmpDirName,i)
+                ReadFasta_Left = "%s/Reads.%d.2.fasta" % (TmpDirName,i)                
                 ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
-                logger.info("Retrieve reads sequences")
-                start_blastdbcmd_time = time.time()
-                StrandList = [".1",".2"]
-                for strand in StrandList:
-                    ReadFasta = TmpDirName + "/Reads.%d%s.fasta" % (i,strand)
-                    ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
-                    BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
-                    if not os.path.isfile(ReadFasta):
-                        BlastdbcmdProcess.launch()
-                    else:
-                        logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
-                    
-            else:    
-                logger.info("Retrieve reads sequences")    
-                start_blastdbcmd_time = time.time()
-                ReadFasta = TmpDirName + "/Reads.%d.fasta" % (i)
+                StrandList = [".1",".2"]              
+            else:
+                StrandList = [""] 
+                
+            logger.info("Retrieve reads sequences")
+            start_blastdbcmd_time = time.time()                
+            for strand in StrandList:
+                ReadFasta = "%s/Reads.%d%s.fasta" % (TmpDirName,i,strand)
+                ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
                 BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
                 if not os.path.isfile(ReadFasta):
                     BlastdbcmdProcess.launch()
                 else:
                     logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
+                        
             
             StatsDict[i]["BlastTime"] += time.time() - start_blastdbcmd_time
             logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
@@ -570,12 +553,12 @@ while (i < MaxIteration) and (Stop == False):
             ExitCode = 0
             TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
             if StrandedData:
-                if args.SS_lib_type in ["RF","FR"]:
+                if args.database_type in ["RF","FR"]:
                     TrinityProcess = Trinity.Trinity(TrinityFasta, right = ReadFasta_Right,
                                                     left = ReadFasta_Left)
                 else:
                     TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
-                TrinityProcess.SS_lib_type = args.SS_lib_type
+                TrinityProcess.SS_lib_type = args.database_type
             else:
                 TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
                 if PairedData:
