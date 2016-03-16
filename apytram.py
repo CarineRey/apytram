@@ -512,7 +512,7 @@ while (i < MaxIteration) and (Stop == False):
     StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
     
     if not StatsDict[i]["ReadsNumber"]:
-        logger.error("No read recruted by Blast at the iteration %s" %i)
+        logger.warning("No read recruted by Blast at the iteration %s" %i)
         Stop = True
         IterationNotFinished = True
         i -= 1
@@ -663,7 +663,7 @@ while (i < MaxIteration) and (Stop == False):
 
                     BaitSequences = FileteredTrinityFasta
                     if not os.stat(BaitSequences).st_size:
-                        logger.error("No sequence has passed the iteration filter at the iteration %s" %(i))
+                        logger.warning("No sequence has passed the iteration filter at the iteration %s" %(i))
                         Stop = True
                         IterationNotFinished = True
                         i -=1

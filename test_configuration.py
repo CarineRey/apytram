@@ -35,6 +35,7 @@
 
 import unittest
 import os
+import sys
 
 from lib import ApytramNeeds
 from lib import BlastPlus
@@ -61,7 +62,9 @@ def search(program):
 
 
 class TestConfigApytram(unittest.TestCase):
-
+	def test_python2_version(self):
+		ver = sys.version[:3]
+		self.assertTrue(ver[0]=="2")
 	#Check Blastp:
 	def test_BlastP(self):
 		#print "\nSearch for blastp"
