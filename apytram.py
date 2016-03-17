@@ -377,7 +377,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     if not os.path.isfile(InputFasta):
         logger.error("Error during concatenation or conversion of input files.")
         sys.exit(1)
-    if os.path.isdir(os.path.dirname(DatabaseName)):
+    if os.path.isdir(os.path.dirname(DatabaseName)) or not os.path.dirname(DatabaseName) :
         logger.info("Database directory exists")
     else:
         logger.info("Database directory does not exist, we create it")
