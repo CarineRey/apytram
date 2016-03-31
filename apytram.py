@@ -4,7 +4,7 @@
  
 # File: apytram.py
 # Created by: Carine Rey
-# Created on: Nov 2016
+# Created on: Nov 2015
 # 
 # 
 # Copyright or © or Copr. Carine Rey
@@ -261,6 +261,9 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
+
+logger.info(" ".join(sys.argv))
+
 ### If iteration begin not from 1, the temporary directory must be given by the user
 if StartIteration != 1 and not args.tmp:
     logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
@@ -276,6 +279,15 @@ if args.tmp:
     TmpDirName = args.tmp
 else:
     TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
+
+def end(exit_code):
+	### Remove tempdir if the option --tmp have not been use
+	if not args.tmp:
+		logger.debug("Remove the temporary directory")
+		#Remove the temporary directory :
+		if "tmp_apytram" in TmpDirName:
+			shutil.rmtree(TmpDirName)
+	sys.exit(exit_code)
 
 ### Set up the output directory
 if args.output_prefix:
@@ -318,11 +330,11 @@ if args.query:
 if args.query_pep:
     if not os.path.isfile(args.query_pep):
         logger.error(args.query_pep+" (-pep) is not a file.")
-        sys.exit(1)
+        end(1)
     
     if not args.query:
         logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
-        sys.exit(1)
+        end(1)
 
 ### Check that there is a database, otherwise build it
 DatabaseName = args.database
@@ -343,13 +355,13 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
             out,err = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
             if err:
                 logger.error(err)
-                sys.exit(1)
+                end(1)
             logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif args.fasta:
             for fasta in args.fasta:
                 if not os.path.isfile(fasta):
                     logger.error("The fasta file (%s) does not exist." %fasta)
-                    sys.exit(1)
+                    end(1)
                 # Concatenate fasta files
             if len(args.fasta) > 1:
                 InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
@@ -358,25 +370,25 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 out,err = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
                 if err:
                     logger.error(err)
-                    sys.exit(1)
+                    end(1)
                 logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
             else:
                 InputFasta = args.fasta[0]
                 
     else :
         logger.error("The database could not be formatted because fasta files (-fa) or fastq files (-fq) are required!")
-        sys.exit(1)
+        end(1)
     
     #Check if the end of sequence name of paired data are 1 or 2
     if PairedData:
         BadReadName = ApytramNeeds.check_paired_data(InputFasta)
         if BadReadName:
             logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %BadReadName)
-            sys.exit(1)
+            end(1)
     #Build blast formated database from a fasta file
     if not os.path.isfile(InputFasta):
         logger.error("Error during concatenation or conversion of input files.")
-        sys.exit(1)
+        end(1)
     if os.path.isdir(os.path.dirname(DatabaseName)) or not os.path.dirname(DatabaseName) :
         logger.info("Database directory exists")
     else:
@@ -392,17 +404,17 @@ CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
     logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
     logger.info("Database %s does not exist" % DatabaseName)
-    sys.exit(1)
+    end(1)
 else:
     logger.info("Database %s exists" % DatabaseName)
 
 ### If there is a query continue, else stop
 if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
-    quit()
+    end(0)
 elif not os.path.isfile(args.query):
     logger.error(args.query+" (-q) is not a file.")
-    sys.exit(1)
+    end(1)
 else:
     logger.info("DB: \"%s\"\tQuery: \"%s\"" %(DatabaseName,QueryFile))
 
@@ -450,10 +462,10 @@ if StartIteration != 1 :
     ### Chech that the bait file exists and is not empty
     if not os.path.isfile(BaitSequences):
         logger.error("%s does not exit, apytram can not restart this job at the iteration %s because the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
-        exit(1)
+        end(1)
     elif not os.stat(BaitSequences).st_size:
         logger.error("%s is empty, apytram can not restart this job at the iteration %sbecause the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
-        exit(1)
+        end(1)
         
 while (i < MaxIteration) and (Stop == False):
     start_iter_i = time.time()
@@ -525,11 +537,9 @@ while (i < MaxIteration) and (Stop == False):
             IterationNotFinished = True
             i -= 1
         else:
-
             ### Retrieve sequences
-
-            logger.info("Split read names depending on 1/ or 2/")
             if args.database_type in ["RF","FR"]:
+                logger.info("Split read names depending on 1/ or 2/")
                 ReadNamesFile_Right = "%s/ReadNames.%d.1.txt" % (TmpDirName,i)
                 ReadNamesFile_Left = "%s/ReadNames.%d.2.txt" % (TmpDirName,i)
                 ReadFasta_Right = "%s/Reads.%d.1.fasta" % (TmpDirName,i)
@@ -594,7 +604,7 @@ while (i < MaxIteration) and (Stop == False):
             logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
             if not os.path.isfile(TrinityFasta): # Trinity found nothing
                 if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
-                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-5:]))
+                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                     logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
                 elif ExitCode != 0:
                     logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
@@ -885,12 +895,7 @@ if args.stats:
 
 logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
         
-### Remove tempdir if the option --tmp have not been use
-if not args.tmp:
-    logger.debug("Remove the temporary directory")
-    #Remove the temporary directory :
-    if "tmp_apytram" in TmpDirName:
-        shutil.rmtree(TmpDirName)
+end(0)
 
 logger.info("--- %s seconds ---" % (time.time() - start_time))
 

@@ -3,7 +3,7 @@
 
 # File: Aligner.py
 # Created by: Carine Rey
-# Created on: Nov 2016
+# Created on: Nov 2015
 # 
 # 
 # Copyright or © or Copr. Carine Rey

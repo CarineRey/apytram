@@ -3,7 +3,7 @@
 
 # File: BlastPlus.py
 # Created by: Carine Rey
-# Created on: Nov 2016
+# Created on: Nov 2015
 # 
 # 
 # Copyright or © or Copr. Carine Rey
@@ -134,10 +134,13 @@ class Blastdbcmd:
         Out = False
         command = ["blastdbcmd","-db",self.Database,"-info"]
         self.logger.debug(" ".join(command))
-        ExitCode = subprocess.call(command,
-                                   stdout=open("/dev/null", "w"),
-                                   stderr=open("/dev/null", "w"))
-        # If no error the database exist
-        if not ExitCode:
+        p = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+        out, err = p.communicate()
+        if err:
+            self.logger.error(err)
+        else:
+       # If no error the database exist
             Out = True             
         return Out

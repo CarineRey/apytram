@@ -3,7 +3,7 @@
 
 # File: ApytramNeeds.py
 # Created by: Carine Rey
-# Created on: Nov 2016
+# Created on: Nov 2015
 # 
 # 
 # Copyright or © or Copr. Carine Rey
@@ -113,7 +113,7 @@ def remove_duplicated_read_names(File):
                               stderr = subprocess.PIPE,
                               shell = True)
         out1, err1 = p1.communicate()
-        p2 = subprocess.Popen(command1,
+        p2 = subprocess.Popen(command2,
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE,
                               shell = True)
