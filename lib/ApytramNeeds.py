@@ -96,7 +96,7 @@ def add_paired_read_names(File):
                           stderr = subprocess.PIPE,
                           shell = True)
     out1, err1 = p1.communicate()
-    p2 = subprocess.Popen(command1,
+    p2 = subprocess.Popen(command2,
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE,
                           shell = True)
@@ -121,6 +121,41 @@ def remove_duplicated_read_names(File):
         return (out1+"\n"+out2, err1+"\n"+err2)
     else:
         return ("","File %s is not a valid path" %File)
+
+def tmp_dir_clean_up(TmpDirName,i):
+    if i == 1 :
+        FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
+                          "%s/input_fasta.fasta" %TmpDirName]
+    else:
+        FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
+                          "%s/ReadNames.%d.1.txt" %(TmpDirName,i),
+                          "%s/ReadNames.%d.2.txt" %(TmpDirName,i),
+                          "%s/Reads.%d.fasta" %(TmpDirName,i),
+                          "%s/Reads.%d.1.fasta" %(TmpDirName,i),
+                          "%s/Reads.%d.2.fasta" %(TmpDirName,i),
+                          "%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
+                          "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
+                          "%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
+                          "%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
+    for f in FilesToRemoves:
+        if os.path.isfile(f):
+            os.remove(f)
+
+def get_free_space(DirPath):
+    free = 0
+    if os.path.isdir(DirPath):
+        st = os.statvfs(DirPath)
+        free = (st.f_bavail * st.f_frsize)
+    return free    
+
+def get_size(Files):
+    size = 0
+    if not type(Files) == type([]):
+        Files = [Files]
+    for f in Files:
+        if os.path.isfile(f):
+            size += os.stat(f).st_size
+    return size
 
 def count_lines(Files):
     Number = 0

@@ -69,7 +69,7 @@ requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["singl
                                   single: single unstranded data ______________________
                                   paired: paired unstranded data ______________________
                                   RF: paired stranded data (/1 = reverse ; /2 = forward)
-                                  FR: paired stranded data (/2 = reverse ; /1 = forward)
+                                  FR: paired stranded data (/1 = forward ; /2 = reverse)
                                   F: single stranded data (reads = forward) ____________
                                   R: single stranded data (reads = reverse) ____________
                                   WARNING: Paired read names must finished by 1 or 2""",
@@ -281,13 +281,14 @@ else:
     TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
 
 def end(exit_code):
-	### Remove tempdir if the option --tmp have not been use
-	if not args.tmp:
-		logger.debug("Remove the temporary directory")
-		#Remove the temporary directory :
-		if "tmp_apytram" in TmpDirName:
-			shutil.rmtree(TmpDirName)
-	sys.exit(exit_code)
+    ### Remove tempdir if the option --tmp have not been use
+    if not args.tmp:
+        logger.debug("Remove the temporary directory")
+        #Remove the temporary directory :
+        if "tmp_apytram" in TmpDirName:
+            shutil.rmtree(TmpDirName)
+    sys.exit(exit_code)
+
 
 ### Set up the output directory
 if args.output_prefix:
@@ -296,11 +297,11 @@ if args.output_prefix:
     if os.path.isdir(OutDirName):
         logger.info("The output directory %s exists" %(os.path.dirname(args.output_prefix)) )
     elif OutDirName: # if OutDirName is not a empty string we create the directory
-        logger.info("The temporary directory %s does not exist, it will be created" % (os.path.dirname(args.output_prefix)))
+        logger.info("The output directory %s does not exist, it will be created" % (os.path.dirname(args.output_prefix)))
         os.makedirs(os.path.dirname(args.output_prefix))
 else:
     logger.error("The output prefix must be defined")
-    sys.exit(1)
+    end(1)
 
 ### Check that query files exist
 if args.query:
@@ -308,10 +309,10 @@ if args.query:
     AliQueryFile = args.query
     if not os.path.isfile(QueryFile):
         logger.error(QueryFile+" (-q) is not a file.")
-        sys.exit(1)
+        end(1)
     elif not os.stat(QueryFile).st_size:
         logger.error(QueryFile+" (-q) is empty.")
-        sys.exit(1)
+        end(1)
     elif ApytramNeeds.count_sequences(QueryFile) !=1:
         logger.warning("%s (-q) contains more than one query. They are %s sequences." %(QueryFile,ApytramNeeds.count_sequences(QueryFile)))
         # If there are multiple probes, align them for the future coverage counter
@@ -336,22 +337,46 @@ if args.query_pep:
         logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
         end(1)
 
+#Get the available free space of the tmp dir
+FreeSpaceTmpDir = ApytramNeeds.get_free_space(TmpDirName)
+logger.debug("%s free space in %s" %(FreeSpaceTmpDir,TmpDirName))
+
+
 ### Check that there is a database, otherwise build it
 DatabaseName = args.database
 CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
 if not CheckDatabase_BlastdbcmdProcess.is_database():
     logger.info("Database %s does not exist" % DatabaseName)
+    DatabaseDirName = os.path.dirname(DatabaseName)
+    if os.path.isdir(DatabaseDirName) or not DatabaseDirName :
+        logger.info("Database directory exists")
+    else:
+        logger.info("Database directory does not exist, we create it")
+        os.makedirs(DatabaseDirName)
+    
+    #Get the available free space of the DB dir
+    FreeSpaceDBDir = ApytramNeeds.get_free_space(DatabaseDirName)
+    logger.debug("%s free space in %s" %(FreeSpaceDBDir,DatabaseDirName))
+
     #Concatenate input files
     if args.fastq or args.fasta:
         if args.fastq:
             for fastq in args.fastq:
                 if not os.path.isfile(fastq):
                     logger.error("The fastq file (%s) does not exist." %fastq)
-                    sys.exit(1)
+                    end(1)
                 # Format the fastq file in fasta
             InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
             logger.info("Convert the fastq file in fasta format")
             start_convert = time.time()
+            input_size = ApytramNeeds.get_size(args.fastq)
+            logger.debug("size of input files: %s " %input_size)
+            if input_size > FreeSpaceTmpDir:
+                logger.error("Not enough available free space in %s to convert input files" %TmpDirName)
+                end(1)
+            if input_size*2 > FreeSpaceDBDir:
+                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
+                end(1)
             out,err = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
             if err:
                 logger.error(err)
@@ -362,8 +387,17 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 if not os.path.isfile(fasta):
                     logger.error("The fasta file (%s) does not exist." %fasta)
                     end(1)
-                # Concatenate fasta files
+            # Check enough available free space
+            input_size = ApytramNeeds.get_size(args.fasta)
+            logger.debug("size of input files: %s " %input_size)
+            if input_size*2 > FreeSpaceDBDir:
+                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
+                end(1)
+            # Concatenate fasta files
             if len(args.fasta) > 1:
+                if input_size > FreeSpaceTmpDir:
+                    logger.error("Not enough available free space in %s to concatenate input files" %TmpDirName)
+                    end(1)
                 InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
                 logger.info("Concatenate fasta files")
                 start_convert = time.time()
@@ -374,7 +408,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
                 logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
             else:
                 InputFasta = args.fasta[0]
-                
+
     else :
         logger.error("The database could not be formatted because fasta files (-fa) or fastq files (-fq) are required!")
         end(1)
@@ -389,12 +423,7 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     if not os.path.isfile(InputFasta):
         logger.error("Error during concatenation or conversion of input files.")
         end(1)
-    if os.path.isdir(os.path.dirname(DatabaseName)) or not os.path.dirname(DatabaseName) :
-        logger.info("Database directory exists")
-    else:
-        logger.info("Database directory does not exist, we create it")
-        os.makedirs(os.path.dirname(DatabaseName))
-    
+        
     # Database building
     logger.info(DatabaseName + " database building")
     MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
@@ -407,6 +436,8 @@ if not CheckDatabase_BlastdbcmdProcess.is_database():
     end(1)
 else:
     logger.info("Database %s exists" % DatabaseName)
+    # Remove temporary fasta file
+    ApytramNeeds.tmp_dir_clean_up(TmpDirName,1)
 
 ### If there is a query continue, else stop
 if not args.query:
@@ -585,7 +616,7 @@ while (i < MaxIteration) and (Stop == False):
                     TrinityProcess.RunAsPaired = True
             # If there is a huge number of reads, remove duplicated reads
             if StatsDict[i]["ReadsNumber"] > 1000:
-                TrinityProcess.NormalizeReads
+                TrinityProcess.NormalizeReads = True
                 
             TrinityProcess.CPU = Threads
             TrinityProcess.max_memory = Memory
@@ -691,9 +722,7 @@ while (i < MaxIteration) and (Stop == False):
                              logger.info("The number of contigs has changed")          
                         elif i >= 2:
                             logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
-                            # Use Exonerate 
-            # Comm Marie : pas compris le coup des 2 exonerate (par rapport à celui d'avant) -- en vrai j'ai compris et indiqué dans readme mais peux tu etre un peu plus explicite ici?
-
+                            # Use Exonerate to compare the current iteration with the previous        
                             start_exo_time = time.time()
                             ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
                             # Keep only the best hit for each contigs
@@ -750,8 +779,12 @@ while (i < MaxIteration) and (Stop == False):
                                 logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[i]["StrictCoverage"],RequiredCoverage))
                                 Stop = True
 
+                        
+                        # Remove tmp file from the i-2 iteration
+                        if i>2:
+                            ApytramNeeds.tmp_dir_clean_up(TmpDirName,i-2)
+                            
                         ### Write a fasta file for this iteration if the option --keep_iterations was selected
-
                         if KeepIterations:
                             if not args.no_best_file:
                             # Best sequences of the iteration
@@ -768,7 +801,7 @@ while (i < MaxIteration) and (Stop == False):
                                                              Message = "iter_%d." %i)
                             # Mafft alignment
                             ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
-
+                             
     if IterationNotFinished:
             logger.debug("Iteration stop before end")
             Reali = i + 1

@@ -139,7 +139,7 @@ class Blastdbcmd:
                                        stderr=subprocess.PIPE)
         out, err = p.communicate()
         if err:
-            self.logger.error(err)
+            self.logger.debug(err)
         else:
        # If no error the database exist
             Out = True             
