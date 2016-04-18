@@ -927,8 +927,5 @@ if args.stats:
 
 
 logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
-        
-end(0)
-
 logger.info("--- %s seconds ---" % (time.time() - start_time))
-
+end(0)
