@@ -142,8 +142,8 @@ def tmp_dir_clean_up(TmpDirName,i):
             os.remove(f)
 
 def get_free_space(DirPath):
-	if not DirPath:
-		DirPath = "."
+    if not DirPath:
+        DirPath = "."
     free = 0
     if os.path.isdir(DirPath):
         st = os.statvfs(DirPath)
