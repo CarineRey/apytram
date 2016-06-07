@@ -472,6 +472,7 @@ StatsDict = {0:{"IterationTime": 0,
                 "BestIdentity":0,
                 "ReadsNumber":0,
                 "BlastTime": 0,
+                "BlastdbcmdTime": 0,
                 "TrinityTime": 0,
                 "Exonerate1Time":0,
                 "Exonerate2Time":0,
@@ -505,6 +506,7 @@ while (i < MaxIteration) and (Stop == False):
     StatsDict[i].update({"IterationTime": 0,
                 "CumulTime": 0,
                 "BlastTime": 0,
+                "BlastdbcmdTime": 0,
                 "TrinityTime": 0,
                 "Exonerate1Time":0,
                 "Exonerate2Time":0,
@@ -594,7 +596,7 @@ while (i < MaxIteration) and (Stop == False):
                     logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
                         
             
-            StatsDict[i]["BlastTime"] += time.time() - start_blastdbcmd_time
+            StatsDict[i]["BlastdbcmdTime"] += time.time() - start_blastdbcmd_time
             logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
 
             ### Launch Trinity
@@ -833,6 +835,7 @@ if i: #We check that there is at least one iteration with a result
         StatsDict[Reali].update({"IterationTime": 0,
                     "CumulTime": 0,
                     "BlastTime": 0,
+                    "BlastdbcmdTime": 0,
                     "TrinityTime": 0,
                     "Exonerate1Time":0,
                     "Exonerate2Time":0,
