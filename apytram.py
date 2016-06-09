@@ -1,26 +1,26 @@
 #!/usr/bin/python
 # coding: utf-8
 
- 
+
 # File: apytram.py
 # Created by: Carine Rey
 # Created on: Nov 2015
-# 
-# 
+#
+#
 # Copyright or © or Copr. Carine Rey
-# This software is a computer program whose purpose is to assembly 
+# This software is a computer program whose purpose is to assembly
 # sequences from RNA-Seq data (paired-end or single-end) using one or
-# more reference homologous sequences. 
+# more reference homologous sequences.
 # This software is governed by the CeCILL license under French law and
-# abiding by the rules of distribution of free software.  You can  use, 
+# abiding by the rules of distribution of free software.  You can  use,
 # modify and/ or redistribute the software under the terms of the CeCILL
 # license as circulated by CEA, CNRS and INRIA at the following URL
-# "http://www.cecill.info". 
+# "http://www.cecill.info".
 # As a counterpart to the access to the source code and  rights to copy,
 # modify and redistribute granted by the license, users are provided only
 # with a limited warranty  and the software's author,  the holder of the
 # economic rights,  and the successive licensors  have only  limited
-# liability. 
+# liability.
 # In this respect, the user's attention is drawn to the risks associated
 # with loading,  using,  modifying and/or developing or reproducing the
 # software by the user in light of its specific status of free software,
@@ -28,12 +28,12 @@
 # therefore means  that it is reserved for developers  and  experienced
 # professionals having in-depth computer knowledge. Users are therefore
 # encouraged to load and test the software's suitability as regards their
-# requirements in conditions enabling the security of their systems and/or 
-# data to be ensured and,  more generally, to use and operate it in the 
-# same conditions as regards security. 
+# requirements in conditions enabling the security of their systems and/or
+# data to be ensured and,  more generally, to use and operate it in the
+# same conditions as regards security.
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
-# 
+#
 
 
 import os
@@ -41,11 +41,11 @@ import re
 import sys
 import time
 import tempfile
-import shutil
 import logging
 import argparse
 import subprocess
 
+from lib import ApytramClasses
 from lib import ApytramNeeds
 from lib import BlastPlus
 from lib import Trinity
@@ -73,24 +73,31 @@ requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["singl
                                   F: single stranded data (reads = forward) ____________
                                   R: single stranded data (reads = reverse) ____________
                                   WARNING: Paired read names must finished by 1 or 2""",
-                            required=True)       
+                            required=True)
+requiredOptions.add_argument('-out', '--output_prefix',  type=str,
+                   help = "Output prefix",required=True)
 ##############
 
 
 ##############
 InUSOptions = parser.add_argument_group('Input Files')
-InUSOptions.add_argument('-fa', '--fasta',  type=str, nargs='*',
+InUSOptions.add_argument('-fa', '--fasta',  type=str,
                    help = "Fasta formated RNA-seq data to build the database of reads (only one file).")
-InUSOptions.add_argument('-fq', '--fastq',  type=str, nargs='*',
+InUSOptions.add_argument('-fq', '--fastq',  type=str,
                    help = "Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
 ##############
 
 ##############
 QueryOptions = parser.add_argument_group('Query File')
 QueryOptions.add_argument('-q', '--query',  type=str,
-                    help = "Fasta file (nucl) with homologous bait sequences which will be treated together for the apytram run. If no query is submitted, the program will just build the database. WARNING: Sequences must not contain other characters that a t g c n (eg. - * . )." )
+                    help = """
+                            Fasta file (nucl) with homologous bait sequences which will be treated together for the apytram run.
+                            If no query is submitted, the program will just build the database.
+                            WARNING: Sequences must not contain "- * . "
+                           """,
+                           )
 QueryOptions.add_argument('-pep', '--query_pep',  type=str,
-                   default = "",       
+                   default = "",
                    help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
 ##############
 
@@ -108,8 +115,6 @@ IterationOptions.add_argument('-i_start','--iteration_start',  type=int,
 
 ##############
 OutOptions = parser.add_argument_group('Output Files')
-OutOptions.add_argument('-out', '--output_prefix',  type=str, default = "./apytram",
-                   help = "Output prefix (Default ./apytram)")
 OutOptions.add_argument('-log', type=str, default="apytram.log",
                    help = "a log file to report avancement (default: apytram.log)")
 OutOptions.add_argument('-tmp',  type=str,
@@ -127,7 +132,7 @@ OutOptions.add_argument('--only_best_file',  action='store_true',
 
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
-# comm Marie : tu expliques les détails des stats quelque part?                             
+# comm Marie : tu expliques les détails des stats quelque part?
 OutOptions.add_argument('--plot', action='store_true',
                              help='Create plots to represent the statistics on each iteration. (default: False)')
 OutOptions.add_argument('--plot_ali', action='store_true',
@@ -160,8 +165,8 @@ StopOptions.add_argument('-required_coverage',  type=float,
                     default = 200 )
 StopOptions.add_argument('--finish_all_iter', action='store_true',
                     help = "By default, iterations are stop if there is no improvment, if this option is used apytram will finish all iteration (-i).",
-                    default = False)              
-                    
+                    default = False)
+
 ##############
 
 
@@ -196,10 +201,54 @@ MiscellaneousOptions.add_argument('-time_max',  type=int,
 ### Option parsing
 args = parser.parse_args()
 
-os.system("echo '[Running in process...]\n[Warning messages may print, but they are no error. If real errors appear, the process will stop]'")
+### Set up the log directory
+if args.log:
+    LogDirName = os.path.dirname(args.log)
+    if not os.path.isdir(LogDirName) and LogDirName:
+        os.makedirs(LogDirName)
+
+### Set up the logger
+LogFile = args.log
+# create logger with 'spam_application'
+logger = logging.getLogger('apytram')
+logger.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler(LogFile)
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.WARN)
+ch.setLevel(logging.DEBUG)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+formatter = logging.Formatter('%(message)s')
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+logger.warning("[Running in process...]\n[Warning messages may print, but they are no error. If real errors appear, the process will stop]")
+logger.info(" ".join(sys.argv))
+
+
+
+### Set up the working directory
+if args.tmp:
+    if os.path.isdir(args.tmp):
+        logger.info("The temporary directory %s exists" %(args.tmp) )
+    else:
+        logger.info("The temporary directory %s does not exist, it will be created" % (args.tmp))
+        os.makedirs(args.tmp)
+    TmpDirName = args.tmp
+else:
+    TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
 
 
 ### Read the arguments
+
+
+# Define global parameters
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
 
@@ -221,87 +270,51 @@ Threads = args.threads
 Memory = args.memory
 MaxTime = args.time_max
 
+
 if args.database_type in ["RF","FR","R","F"]:
     StrandedData = True
 else:
     StrandedData = False
-    
+
 if args.database_type in ["paired","RF","FR"]:
      PairedData = True
 else:
      PairedData = False
-    
-    
+
 if args.plot:
     args.stats = True
 
-### Set up the log directory
-if args.log:
-    LogDirName = os.path.dirname(args.log)
-    if not os.path.isdir(LogDirName) and LogDirName:
-        os.makedirs(LogDirName)
+# Define query files
+Queries = args.query.split(",")
 
-### Set up the logger
-LogFile = args.log
-# create logger with 'spam_application'
-logger = logging.getLogger('apytram')
-logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler(LogFile)
-fh.setLevel(logging.DEBUG)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARN)
-# create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.addHandler(ch)
+error = False
+logger.warning("Query:")
 
-
-logger.info(" ".join(sys.argv))
-
-### If iteration begin not from 1, the temporary directory must be given by the user
-if StartIteration != 1 and not args.tmp:
-    logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
-    sys.exit(1)    
-
-### Set up the working directory
-if args.tmp:
-    if os.path.isdir(args.tmp):
-        logger.info("The temporary directory %s exists" %(args.tmp) )
+Queries_dict = {}
+Query_name = 1
+for query in Queries:
+    if not os.path.isfile(query):
+        logger.error("\t-%s ... ERROR (Don't exist)" %(query))
+        error = True
+    elif not os.stat(query).st_size:
+        logger.error("\t-%s ... ERROR (empty)" %(query))
+        error = True
     else:
-        logger.info("The temporary directory %s does not exist, it will be created" % (args.tmp))
-        os.makedirs(args.tmp)
-    TmpDirName = args.tmp
-else:
-    TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
+        new_query = ApytramClasses.Query(query)
+        logger.warning("\t-%s ... ok (%s sequences)" %(new_query.RawQuery,new_query.SequenceNb))
+        if not Queries_dict.has_key(Query_name):
+            Queries_dict[Query_name] = new_query
+            Query_name +=1
+        else:
+            logger.error("""The name "%s" must have only one associated query file.You must chose between:\n\t%s\n\t%s"""
+                        %(new_query.Name,
+                        new_species.RawQuery,
+                        Species_dict[new_query.Name].RawQuery))
+            error = True
 
-def end(exit_code):
-    ### Remove tempdir if the option --tmp have not been use
-    if not args.tmp:
-        logger.debug("Remove the temporary directory")
-        #Remove the temporary directory :
-        if "tmp_apytram" in TmpDirName:
-            shutil.rmtree(TmpDirName)
-    sys.exit(exit_code)
+if len(Queries_dict):
+    logger.warning("No query")
 
-
-### Set up the output directory
-if args.output_prefix:
-    OutDirName = os.path.dirname(args.output_prefix)
-    OutPrefixName = args.output_prefix
-    if os.path.isdir(OutDirName):
-        logger.info("The output directory %s exists" %(os.path.dirname(args.output_prefix)) )
-    elif OutDirName: # if OutDirName is not a empty string we create the directory
-        logger.info("The output directory %s does not exist, it will be created" % (os.path.dirname(args.output_prefix)))
-        os.makedirs(os.path.dirname(args.output_prefix))
-else:
-    logger.error("The output prefix must be defined")
-    end(1)
 
 ### Check that query files exist
 if args.query:
@@ -309,10 +322,10 @@ if args.query:
     AliQueryFile = args.query
     if not os.path.isfile(QueryFile):
         logger.error(QueryFile+" (-q) is not a file.")
-        end(1)
+        end(1,TmpDirName)
     elif not os.stat(QueryFile).st_size:
         logger.error(QueryFile+" (-q) is empty.")
-        end(1)
+        end(1,TmpDirName)
     elif ApytramNeeds.count_sequences(QueryFile) !=1:
         logger.warning("%s (-q) contains more than one query. They are %s sequences." %(QueryFile,ApytramNeeds.count_sequences(QueryFile)))
         # If there are multiple probes, align them for the future coverage counter
@@ -327,512 +340,191 @@ if args.query:
         logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
 
 
-# If the -pep option is used, the -q option must be precised
-if args.query_pep:
-    if not os.path.isfile(args.query_pep):
-        logger.error(args.query_pep+" (-pep) is not a file.")
-        end(1)
-    
-    if not args.query:
-        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
-        end(1)
+# # If the -pep option is used, the -q option must be precised
+# if args.query_pep:
+#   if not os.path.isfile(args.query_pep):
+#        logger.error(args.query_pep+" (-pep) is not a file.")
+#        end(1,TmpDirName)
+#
+#    if not args.query:
+#        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
+#        end(1,TmpDirName)
+
+
+# Define species
+Species_dict = {}
+
+DBs = args.database.split(",")
+
+FAs = []
+FQs = []
+if args.fasta :
+    FAs += args.fasta.split(",")
+if args.fastq :
+    FQs += args.fastq.split(",")
+
+UniqSpecies_flag = True
+
+if len(DBs) > 1 :
+    # There are several species:
+    UniqSpecies_flag = False
+    if not re.search(":",DBs[0]):
+        DBs[0] += ":SP"
+
+# Get species names and check if a database exist
+for item in DBs:
+    new_species = ApytramClasses.RNA_species(start_time)
+    new_species.DatabaseType = args.database_type
+    new_species.StrandedData = StrandedData
+    new_species.PairedData = PairedData
+    s = item.split(":")
+    if len(s) == 2 :
+        (new_species.DatabaseName,new_species.Species) = s
+        if not new_species.Species in Species_dict.keys():
+            new_species.FormatedDatabase = new_species.has_a_formated_database()
+            Species_dict[new_species.Species] = new_species
+        else:
+            logger.error("""The species "%s" must have only one associated database.You must chose between:\n\t%s\n\t%s"""
+                        %(new_species.Species,
+                        new_species.DatabaseName,
+                        Species_dict[new_species.Species].DatabaseName))
+    else:
+        logger.error(""" "%s" must be formatted as "db:species" if you want to use the multispecies option" """ %(item))
+# associate fasta files with a species
+for item in FAs:
+    f = item.split(":")
+    if len(f) == 1 and UniqSpecies_flag:
+        f.append(":SP")
+    if len(f) == 2:
+        (fa,species) = f
+        if os.path.isfile(fa):
+                Species_dict[species].Fasta.append(fa)
+        else:
+            logger.error("%s (-fa) is not a file." %(fa))
+            end(1,TmpDirName)
+    else:
+        logger.error( """ "%s" must be formatted as "fa_path:species" if you want to use the multispecies option" """ %(item))
+
+# associate fastq files with a species
+for item in FQs:
+    f = item.split(":")
+    if len(f) == 1 and UniqSpecies_flag:
+        f.append(":SP")
+    if len(f) == 2:
+        (fq,species) = f
+        if os.path.isfile(fq):
+                Species_dict[species].Fastq.append(fq)
+        else:
+            logger.error("%s (-fq) is not a file." %(fq))
+            end(1,TmpDirName)
+    else:
+        logger.error( """ "%s" must be formatted as "fq_path:species" if you want to use the multispecies option" """ %(item))
+
+
+#Check all species has a formated database or input fasta/fastq files:
+
+logger.warning("Species:")
+for species in Species_dict:
+    if Species_dict[species].FormatedDatabase:
+        logger.warning("\t-%s ... Formated database" %(species))
+    elif Species_dict[species].Fasta and Species_dict[species].Fastq:
+        logger.warning("\t-%s ... NO formated database. fasta AND fastq input files -> ERROR" %(species))
+        error = True
+    elif Species_dict[species].Fasta or Species_dict[species].Fastq:
+        logger.warning("\t-%s ... NO formated database. (A database will be built)" %(species))
+    else:
+        logger.warning("\t-%s ... NO formated database and NO input fasta/fastq files -> ERROR" %(species))
+        error = True
+    if not error:
+        Species_dict[species].set_TmpDir(TmpDirName,logger)
+        Species_dict[species].set_OutputDir(args.output_prefix,logger)
+
+if error:
+    end(1,TmpDirName)
+
+
+
+# ### If iteration begin not from 1, the temporary directory must be given by the user
+# if StartIteration != 1 and not args.tmp:
+#     logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
+#     sys.exit(1)
+
+
 
 #Get the available free space of the tmp dir
 FreeSpaceTmpDir = ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s" %(FreeSpaceTmpDir,TmpDirName))
 
 
-### Check that there is a database, otherwise build it
-DatabaseName = args.database
-CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
-if not CheckDatabase_BlastdbcmdProcess.is_database():
-    logger.info("Database %s does not exist" % DatabaseName)
-    DatabaseDirName = os.path.dirname(DatabaseName)
-    if os.path.isdir(DatabaseDirName) or not DatabaseDirName :
-        logger.info("Database directory exists")
-    else:
-        logger.info("Database directory does not exist, we create it")
-        os.makedirs(DatabaseDirName)
-    
-    #Get the available free space of the DB dir
-    FreeSpaceDBDir = ApytramNeeds.get_free_space(DatabaseDirName)
-    logger.debug("%s free space in %s" %(FreeSpaceDBDir,DatabaseDirName))
-
-    #Concatenate input files
-    if args.fastq or args.fasta:
-        if args.fastq:
-            for fastq in args.fastq:
-                if not os.path.isfile(fastq):
-                    logger.error("The fastq file (%s) does not exist." %fastq)
-                    end(1)
-                # Format the fastq file in fasta
-            InputFasta = "%s/input_fastq.fasta" %(TmpDirName)
-            logger.info("Convert the fastq file in fasta format")
-            start_convert = time.time()
-            input_size = ApytramNeeds.get_size(args.fastq)
-            logger.debug("size of input files: %s " %input_size)
-            if input_size > FreeSpaceTmpDir:
-                logger.error("Not enough available free space in %s to convert input files" %TmpDirName)
-                end(1)
-            if input_size*2 > FreeSpaceDBDir:
-                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
-                end(1)
-            out,err = ApytramNeeds.fastq2fasta(" ".join(args.fastq),InputFasta)
-            if err:
-                logger.error(err)
-                end(1)
-            logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
-        elif args.fasta:
-            for fasta in args.fasta:
-                if not os.path.isfile(fasta):
-                    logger.error("The fasta file (%s) does not exist." %fasta)
-                    end(1)
-            # Check enough available free space
-            input_size = ApytramNeeds.get_size(args.fasta)
-            logger.debug("size of input files: %s " %input_size)
-            if input_size*2 > FreeSpaceDBDir:
-                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
-                end(1)
-            # Concatenate fasta files
-            if len(args.fasta) > 1:
-                if input_size > FreeSpaceTmpDir:
-                    logger.error("Not enough available free space in %s to concatenate input files" %TmpDirName)
-                    end(1)
-                InputFasta = "%s/input_fasta.fasta" %(TmpDirName)
-                logger.info("Concatenate fasta files")
-                start_convert = time.time()
-                out,err = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
-                if err:
-                    logger.error(err)
-                    end(1)
-                logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
-            else:
-                InputFasta = args.fasta[0]
-
-    else :
-        logger.error("The database could not be formatted because fasta files (-fa) or fastq files (-fq) are required!")
-        end(1)
-    
-    #Check if the end of sequence name of paired data are 1 or 2
-    if PairedData:
-        BadReadName = ApytramNeeds.check_paired_data(InputFasta)
-        if BadReadName:
-            logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %BadReadName)
-            end(1)
-    #Build blast formated database from a fasta file
-    if not os.path.isfile(InputFasta):
-        logger.error("Error during concatenation or conversion of input files.")
-        end(1)
-        
-    # Database building
-    logger.info(DatabaseName + " database building")
-    MakeblastdbProcess = BlastPlus.Makeblastdb(InputFasta,DatabaseName)
-    out,err = MakeblastdbProcess.launch()
-
-CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, "", "")
-if not CheckDatabase_BlastdbcmdProcess.is_database():
-    logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
-    logger.info("Database %s does not exist" % DatabaseName)
-    end(1)
-else:
-    logger.info("Database %s exists" % DatabaseName)
-    # Remove temporary fasta file
-    ApytramNeeds.tmp_dir_clean_up(TmpDirName,1)
+### Check that there is a database for each species, otherwise build it
+for species in Species_dict :
+    Species = Species_dict[species]
+    if not Species.FormatedDatabase:
+        Species.build_database(FreeSpaceTmpDir,TmpDirName,logger)
 
 ### If there is a query continue, else stop
 if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
-    end(0)
-elif not os.path.isfile(args.query):
-    logger.error(args.query+" (-q) is not a file.")
-    end(1)
-else:
-    logger.info("DB: \"%s\"\tQuery: \"%s\"" %(DatabaseName,QueryFile))
+    end(0,TmpDirName)
 
-### Make iterations
-# Initialisation
-i = 0
-Stop = False
-BaitSequences = QueryFile
-IterationNotFinished = False
 
-StatsDict = {0:{"IterationTime": 0,
-                "CumulTime": time.time() - start_time,
-                "LargeCoverage": 0,
-                "StrictCoverage": 0,
-                "NbContigs": 0,
-                "AverageLength": 0,
-                "TotalLength": 0,
-                "BestLength":0,
-                "AverageScore": 0,
-                "TotalScore": 0,
-                "BestScore":0,
-                "AverageIdentity": 0,
-                "TotalIdentity": 0,
-                "BestIdentity":0,
-                "ReadsNumber":0,
-                "BlastTime": 0,
-                "BlastdbcmdTime": 0,
-                "TrinityTime": 0,
-                "Exonerate1Time":0,
-                "Exonerate2Time":0,
-                "MafftTime":0,
-                "PythonTime":time.time() - start_time
-                }}
+for Query in Queries_dict:
     
-logger.info("Iterations begin")
-start_iter = time.time()
-
-### If apytram restart a job
-if StartIteration != 1 :
-    for i in range(1,StartIteration):
-        logger.debug("Iteration %s has already been executed" %i)
-        StatsDict[i] = StatsDict[(i-1)].copy()
-    Reali = i
-    ### Last Trinity filtered file is the baitfile
-    BaitSequences = "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
-    ### Chech that the bait file exists and is not empty
-    if not os.path.isfile(BaitSequences):
-        logger.error("%s does not exit, apytram can not restart this job at the iteration %s because the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
-        end(1)
-    elif not os.stat(BaitSequences).st_size:
-        logger.error("%s is empty, apytram can not restart this job at the iteration %sbecause the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
-        end(1)
-        
-while (i < MaxIteration) and (Stop == False):
-    start_iter_i = time.time()
-    i += 1
-    StatsDict[i] = StatsDict[i-1].copy()
-    StatsDict[i].update({"IterationTime": 0,
-                "CumulTime": 0,
-                "BlastTime": 0,
-                "BlastdbcmdTime": 0,
-                "TrinityTime": 0,
-                "Exonerate1Time":0,
-                "Exonerate2Time":0,
-                "MafftTime":0,
-                "PythonTime":0,
-                })
+    ### Make iterations
+    # Initialisation
+    i = 0
+    Stop = False
+    BaitSequences = QueryFile
+    IterationNotFinished = False
     
-    logger.info("Iteration %d/%d" %(i,MaxIteration))
+    StatsDict = {0:{"IterationTime": 0,
+                    "CumulTime": time.time() - start_time,
+                    "LargeCoverage": 0,
+                    "StrictCoverage": 0,
+                    "NbContigs": 0,
+                    "AverageLength": 0,
+                    "TotalLength": 0,
+                    "BestLength":0,
+                    "AverageScore": 0,
+                    "TotalScore": 0,
+                    "BestScore":0,
+                    "AverageIdentity": 0,
+                    "TotalIdentity": 0,
+                    "BestIdentity":0,
+                    "ReadsNumber":0,
+                    "BlastTime": 0,
+                    "BlastdbcmdTime": 0,
+                    "TrinityTime": 0,
+                    "Exonerate1Time":0,
+                    "Exonerate2Time":0,
+                    "MafftTime":0,
+                    "PythonTime":time.time() - start_time
+                    }}
     
-    ### Blast bait sequences on database of reads
+    logger.info("Iterations begin")
+    start_iter = time.time()
     
-    logger.info("Blast bait sequences on reads database")
-    start_blast_time = time.time()
-    ReadNamesFile = "%s/ReadNames.%d.txt" % (TmpDirName,i)
-
-    if args.query_pep and i == 1:
-        BlastnProcess = BlastPlus.Blast("tblastn", DatabaseName, args.query_pep)
-        BlastnProcess.Evalue = Evalue
-    else:
-        BlastnProcess = BlastPlus.Blast("blastn", DatabaseName, BaitSequences)
-        BlastnProcess.Evalue = Evalue
-        BlastnProcess.Task = "blastn"
-
-    BlastnProcess.Threads = Threads
-    BlastnProcess.OutFormat = "6 sacc"
-
-    # Write read names in ReadNamesFile if the file does not exist
-    if not os.path.isfile(ReadNamesFile):
-        (out,err) = BlastnProcess.launch(ReadNamesFile)
-    else:
-        logger.warn("%s has already been created, it will be used" %ReadNamesFile )
-        
-    StatsDict[i]["BlastTime"] = time.time() - start_blast_time
-    logger.debug("blast --- %s seconds ---" % (StatsDict[i]["BlastTime"]))
-    if PairedData:
-        # Get paired reads names and remove duplicated names
-        logger.info("Get paired reads names and remove duplicated names")
-        ExitCode = ApytramNeeds.add_paired_read_names(ReadNamesFile)
-    else:
-        # Remove duplicated names
-        logger.info("Remove duplicated names")
-        out, err = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
-        if err != "\n":
-            logger.error(err)
-    
-    # Count the number of reads which will be used in the Trinity assembly
-    logger.info("Count the number of reads")
-    StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
-    
-    if not StatsDict[i]["ReadsNumber"]:
-        logger.warning("No read recruted by Blast at the iteration %s" %i)
-        Stop = True
-        IterationNotFinished = True
-        i -= 1
-    else:    
-        # Compare the read list names with the list of the previous iteration:
-        Identical = ApytramNeeds.are_identical(ReadNamesFile,"%s/ReadNames.%d.txt" % (TmpDirName,i-1))
-        if Identical and not FinishAllIter:
-            logger.info("Reads from the current iteration are identical to reads from the previous iteration")
-            Stop = True
-            IterationNotFinished = True
-            i -= 1
-        else:
-            ### Retrieve sequences
-            if args.database_type in ["RF","FR"]:
-                logger.info("Split read names depending on 1/ or 2/")
-                ReadNamesFile_Right = "%s/ReadNames.%d.1.txt" % (TmpDirName,i)
-                ReadNamesFile_Left = "%s/ReadNames.%d.2.txt" % (TmpDirName,i)
-                ReadFasta_Right = "%s/Reads.%d.1.fasta" % (TmpDirName,i)
-                ReadFasta_Left = "%s/Reads.%d.2.fasta" % (TmpDirName,i)                
-                out, err = ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
-                if err:
-                    logger.error(err)
-                StrandList = [".1",".2"]              
-            else:
-                StrandList = [""] 
-                
-            logger.info("Retrieve reads sequences")
-            start_blastdbcmd_time = time.time()                
-            for strand in StrandList:
-                ReadFasta = "%s/Reads.%d%s.fasta" % (TmpDirName,i,strand)
-                ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
-                BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
-                if not os.path.isfile(ReadFasta):
-                    (out,err) = BlastdbcmdProcess.launch()
-                else:
-                    logger.warn("%s has already been created, it will be used" %(ReadFasta) ) 
-                        
-            
-            StatsDict[i]["BlastdbcmdTime"] += time.time() - start_blastdbcmd_time
-            logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
-
-            ### Launch Trinity
-
-            start_trinity_time = time.time()
-            logger.info("Launch Trinity")
-            ExitCode = 0
-            TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
-            if StrandedData:
-                if args.database_type in ["RF","FR"]:
-                    TrinityProcess = Trinity.Trinity(TrinityFasta, right = ReadFasta_Right,
-                                                    left = ReadFasta_Left)
-                else:
-                    TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
-                TrinityProcess.SS_lib_type = args.database_type
-            else:
-                TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
-                if PairedData:
-                    TrinityProcess.RunAsPaired = True
-            # If there is a huge number of reads, remove duplicated reads
-            if StatsDict[i]["ReadsNumber"] > 1000:
-                TrinityProcess.NormalizeReads = True
-                
-            TrinityProcess.CPU = Threads
-            TrinityProcess.max_memory = Memory
-            # Keep only contig with a length superior to MinLength
-            TrinityProcess.MinLength = MinLength
-
-            # Use the  --full_cleanup Trinity option to keep only the contig file
-            TrinityProcess.FullCleanup = True
-            if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
-                (out,err,ExitCode) = TrinityProcess.launch()
-            else:
-                logger.warn("%s has already been created, it will be used" %(TrinityFasta+".Trinity.fasta") ) 
-
-            TrinityFasta = TrinityFasta + ".Trinity.fasta"
-            StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
-            logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
-            if not os.path.isfile(TrinityFasta): # Trinity found nothing
-                if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
-                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-                    logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
-                elif ExitCode != 0:
-                    logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-                    logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %ExitCode)
-                Stop = True
-                IterationNotFinished = True
-                i -=1
-            else:
-
-                ### Filter Trinity contigs to keep only homologous sequences of the reference genes
-
-                logger.info("Compare Trinity results with query sequences")
-                # Use Exonerate 
-                TrinityExonerate = "%s/Trinity_iter_%d.exonerate_cdna2g" % (TmpDirName, i)
-                start_exo_time = time.time()
-                TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
-                # Keep only the best hit for each contig from Trinity 
-                TrinityExonerateProcess.Bestn = 1 
-                TrinityExonerateProcess.Model = "cdna2genome"
-                # Customize the output format
-                TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-                # Write the result in a file
-                TrinityExonerateFile = open(TrinityExonerate,"w")
-                TrinityExonerateFile.write(TrinityExonerateResult)
-                TrinityExonerateFile.close()
-                if not TrinityExonerateResult:
-                    logger.info("Reconstructed sequences but no homologous with references")
-                    logger.info("Try to get homologies with a more sensible model")
-                    ### Try to get homologies with a more sensible model
-                    TrinityExonerate = "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i)
-                    start_exo_time = time.time()
-                    TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
-                    # Keep only the best hit for each contig from Trinity 
-                    TrinityExonerateProcess.Bestn = 1 
-                    TrinityExonerateProcess.Model = "coding2genome"
-                    # Customize the output format
-                    TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                    (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-                    # Write the result in a file
-                    TrinityExonerateFile = open(TrinityExonerate,"w")
-                    TrinityExonerateFile.write(TrinityExonerateResult)
-                    TrinityExonerateFile.close()
-
-                if not TrinityExonerateResult:
-                    logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
-                    Stop = True
-                    IterationNotFinished = True
-                    i -= 1
-                else:
-                    # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
-                    BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
-                                             minalilength = MinAliLength)
-                    StatsDict[i].update(StatsIter)
-                    FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-                    StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
-                    logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
-
-                    # Write filtered sequences in a file
-                    logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength)) 
-                    FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
-                    ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta,
-                                                        ReverseNames = ReverseNames)
-
-                    ### Validated sequences become bait sequences
-
-                    BaitSequences = FileteredTrinityFasta
-                    if not os.stat(BaitSequences).st_size:
-                        logger.warning("No sequence has passed the iteration filter at the iteration %s" %(i))
-                        Stop = True
-                        IterationNotFinished = True
-                        i -=1
-                    else:
-                        ### Compare sequences of the current iteration to those of the previous iteration
-
-                        logger.info("Compare results with the previous iteration")
-
-                        #Check if the number of contigs has changed
-
-                        logger.info("Check if the number of contigs has changed")
-                        StatsDict[i]["NbContigs"] = len(FilteredSequenceNames)
-
-                        if StatsDict[i]["NbContigs"] != StatsDict[i-1]["NbContigs"]:
-                             logger.info("The number of contigs has changed")          
-                        elif i >= 2:
-                            logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
-                            # Use Exonerate to compare the current iteration with the previous        
-                            start_exo_time = time.time()
-                            ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
-                            # Keep only the best hit for each contigs
-                            Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
-                            ExonerateProcess.Bestn = 1
-                            ExonerateProcess.Model =  "est2genome"
-                            # Customize the output format
-                            ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
-                            (out,err,ExonerateResult) = ExonerateProcess.get_output()
-                            ExonerateFile = open(Exonerate,"w")
-                            ExonerateFile.write(ExonerateResult)
-                            ExonerateFile.close()
-                            AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
-                            if AlmostIdenticalResults and not FinishAllIter:
-                                logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
-                                Stop =True
-                            StatsDict[i]["Exonerate2Time"] = time.time() - start_exo_time
-                            logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict[i]["Exonerate2Time"]))
-
-                        # Check that the coverage has increased compared to the previous iteration
-
-                        logger.info("Check that the coverage has inscreased compared to the previous iteration")
-                        # Use Mafft
-                        start_mafft_time = time.time()
-                        MafftProcess = Aligner.Mafft(AliQueryFile)
-                        MafftProcess.QuietOption = True
-                        MafftProcess.AutoOption = True
-                        #MafftProcess.AdjustdirectionOption = True
-                        MafftProcess.AddOption = FileteredTrinityFasta
-                        (MafftResult,err) = MafftProcess.get_output()
-                        StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
-                        logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"]))
-                        StatsDict[i]["MafftTime"] = time.time() - start_mafft_time
-                        logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
-
-                        if not FinishAllIter:
-                            # Stop iteration if both Largecoverage and Total length are not improved
-                            if StatsDict[i]["AverageLength"] > StatsDict[i-1]["AverageLength"]:
-                                pass
-                            elif StatsDict[i]["AverageScore"] > StatsDict[i-1]["AverageScore"]:
-                                pass
-                            elif StatsDict[i]["TotalLength"] > StatsDict[i-1]["TotalLength"]:
-                                pass
-                            elif StatsDict[i]["TotalScore"] > StatsDict[i-1]["TotalScore"]:
-                                pass
-                            elif StatsDict[i]["BestScore"] > StatsDict[i-1]["BestScore"]:
-                                pass
-                            elif StatsDict[i]["LargeCoverage"] <= StatsDict[i-1]["LargeCoverage"]:
-                                logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
-                                Stop = True
-
-                            # Stop iteration if the RequiredCoverage is reached
-                            if StatsDict[i]["StrictCoverage"] >= RequiredCoverage:
-                                logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[i]["StrictCoverage"],RequiredCoverage))
-                                Stop = True
-
-                        
-                        # Remove tmp file from the i-2 iteration
-                        if i>2:
-                            ApytramNeeds.tmp_dir_clean_up(TmpDirName,i-2)
-                            
-                        ### Write a fasta file for this iteration if the option --keep_iterations was selected
-                        if KeepIterations:
-                            if not args.no_best_file:
-                            # Best sequences of the iteration
-                                ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                                 "%s.iter_%d.best.fasta" %(OutPrefixName,i), 
-                                                                 Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                                 Names = BestScoreNames.values(),
-                                                                 Message = "iter_%d.best." %i)
-                            # All sequences of the iteration
-                            ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
-                                                             TrinityExonerateResultsDict,
-                                                             "%s.iter_%d.fasta" %(OutPrefixName,i),
-                                                             Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                             Message = "iter_%d." %i)
-                            # Mafft alignment
-                            ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
-                             
-    if IterationNotFinished:
-            logger.debug("Iteration stop before end")
-            Reali = i + 1
-    else: 
+    ### If apytram restart a job
+    if StartIteration != 1 :
+        for i in range(1,StartIteration):
+            logger.debug("Iteration %s has already been executed" %i)
+            StatsDict[i] = StatsDict[(i-1)].copy()
         Reali = i
+        ### Last Trinity filtered file is the baitfile
+        BaitSequences = "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
+        ### Chech that the bait file exists and is not empty
+        if not os.path.isfile(BaitSequences):
+            logger.error("%s does not exit, apytram can not restart this job at the iteration %s because the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
+            end(1,TmpDirName)
+        elif not os.stat(BaitSequences).st_size:
+            logger.error("%s is empty, apytram can not restart this job at the iteration %sbecause the iteration %s is not present in the temporary directory %s" %(BaitSequences,i+1,i,TmpDirName))
+            end(1,TmpDirName)
     
-    NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
-                 StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
-                 StatsDict[Reali]["Exonerate2Time"]
-    StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
-                             "CumulTime": time.time() - start_time,
-                             "PythonTime": time.time() - start_iter_i - NoPythonTime })
-    logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
-    
-    if (time.time() - start_time) > MaxTime and Stop == False:
-        logger.warn("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
-        Stop = True
-
-
-
-logger.info("End of Iterations. Iterative process takes %s seconds." %(time.time() - start_iter))
-start_output = time.time()
-if i: #We check that there is at least one iteration with a result
-    if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
+    while (i < MaxIteration) and (Stop == False):
         start_iter_i = time.time()
-        Reali +=1
-        #### Final filter which is equivalent at a new iteration
-        StatsDict[Reali] = StatsDict[Reali-1].copy()
-        StatsDict[Reali].update({"IterationTime": 0,
+        i += 1
+        StatsDict[i] = StatsDict[i-1].copy()
+        StatsDict[i].update({"IterationTime": 0,
                     "CumulTime": 0,
                     "BlastTime": 0,
                     "BlastdbcmdTime": 0,
@@ -842,93 +534,425 @@ if i: #We check that there is at least one iteration with a result
                     "MafftTime":0,
                     "PythonTime":0,
                     })
- 
-        # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
-        BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
-                                         FinalMinIdentityPercentage,
-                                         minalilengthpercentage = FinalMinAliLength,
-                                         minlengthpercentage = FinalMinLength)
-        StatsDict[Reali].update(StatsIter)
-        FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-        logger.info("Filter sequence with a identity percentage superior to %d and a percentage alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
-        
-        if FilteredSequenceNames: # If sequences pass the last filter
-            # Write Filter hit
-            FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, Reali+1)
-            ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames,
-                                                 FileteredTrinityFasta, ReverseNames = ReverseNames)
-
-    start_output = time.time()
-    if FilteredSequenceNames: # If sequences pass the last filter
-        StatsDict[Reali]["NbContigs"] = len(FilteredSequenceNames)
-        #### Write output files
-        logger.info("Write outputfiles")
-        if not args.no_best_file:
-            # Best sequences
-            ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                         OutPrefixName+".best.fasta", 
-                                                         Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                         Names = BestScoreNames.values(),
-                                                         Message = "best_")
-        if not args.only_best_file:
-            # Last iteration seqeunces
-            ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
-                                                         TrinityExonerateResultsDict,
-                                                         OutPrefixName+".fasta",
-                                                         Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                         Names = FilteredSequenceNames)
-        
-        if args.plot_ali or args.stats:
-            ### Calculate the coverage
-            logger.info("Calculate the final coverage")
-            # Use Mafft
-            start_mafft_time = time.time()
-            MafftProcess = Aligner.Mafft(AliQueryFile)
-            MafftProcess.QuietOption = True
-            MafftProcess.AutoOption = True
-            #MafftProcess.AdjustdirectionOption = True
-            MafftProcess.AddOption = OutPrefixName+".fasta"
-            (MafftResult,err) = MafftProcess.get_output()
-            StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
-            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
-            StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
-            logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
-
-            NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
-                 StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
-                 StatsDict[Reali]["Exonerate2Time"]
-            StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
-                                         "CumulTime": time.time() - start_time,
-                                         "PythonTime": time.time() - start_iter_i - NoPythonTime })
-
-    # Stats files
     
-    if args.plot_ali:
-        start_output_ali = time.time()
-        LengthAlignment = len(DicPlotCov[DicPlotCov.keys()[0]])
-        if LengthAlignment <= 3100:
-            logger.info("Create plot of the final alignment (OutPrefix.ali.png)")         
-            ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
+        logger.info("Iteration %d/%d" %(i,MaxIteration))
+    
+        ### Blast bait sequences on database of reads
+    
+        logger.info("Blast bait sequences on reads database")
+        start_blast_time = time.time()
+        ReadNamesFile = "%s/ReadNames.%d.txt" % (TmpDirName,i)
+    
+        if args.query_pep and i == 1:
+            BlastnProcess = BlastPlus.Blast("tblastn", DatabaseName, args.query_pep)
+            BlastnProcess.Evalue = Evalue
         else:
-            logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")         
-        logger.info("Write the final alignment in OutPrefix.ali.fasta")
-        ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
-        logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
-        
-else:
-    logger.warn("No results")
-
-if args.stats:
-    start_output_stat = time.time()
-    logger.info("Write statistics file (OutPrefix.stats.csv)")
-    ApytramNeeds.write_stats(StatsDict,OutPrefixName)
-
-    if args.plot:
-        logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
-        ApytramNeeds.create_plot(StatsDict, OutPrefixName)
-        logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
-
-
-logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
-logger.info("--- %s seconds ---" % (time.time() - start_time))
-end(0)
+            BlastnProcess = BlastPlus.Blast("blastn", DatabaseName, BaitSequences)
+            BlastnProcess.Evalue = Evalue
+            BlastnProcess.Task = "blastn"
+    
+        BlastnProcess.Threads = Threads
+        BlastnProcess.OutFormat = "6 sacc"
+    
+        # Write read names in ReadNamesFile if the file does not exist
+        if not os.path.isfile(ReadNamesFile):
+            (out,err) = BlastnProcess.launch(ReadNamesFile)
+        else:
+            logger.warn("%s has already been created, it will be used" %ReadNamesFile )
+    
+        StatsDict[i]["BlastTime"] = time.time() - start_blast_time
+        logger.debug("blast --- %s seconds ---" % (StatsDict[i]["BlastTime"]))
+        if PairedData:
+            # Get paired reads names and remove duplicated names
+            logger.info("Get paired reads names and remove duplicated names")
+            ExitCode = ApytramNeeds.add_paired_read_names(ReadNamesFile)
+        else:
+            # Remove duplicated names
+            logger.info("Remove duplicated names")
+            out, err = ApytramNeeds.remove_duplicated_read_names(ReadNamesFile)
+            if err != "\n":
+                logger.error(err)
+    
+        # Count the number of reads which will be used in the Trinity assembly
+        logger.info("Count the number of reads")
+        StatsDict[i]["ReadsNumber"] = ApytramNeeds.count_lines(ReadNamesFile)
+    
+        if not StatsDict[i]["ReadsNumber"]:
+            logger.warning("No read recruted by Blast at the iteration %s" %i)
+            Stop = True
+            IterationNotFinished = True
+            i -= 1
+        else:
+            # Compare the read list names with the list of the previous iteration:
+            Identical = ApytramNeeds.are_identical(ReadNamesFile,"%s/ReadNames.%d.txt" % (TmpDirName,i-1))
+            if Identical and not FinishAllIter:
+                logger.info("Reads from the current iteration are identical to reads from the previous iteration")
+                Stop = True
+                IterationNotFinished = True
+                i -= 1
+            else:
+                ### Retrieve sequences
+                if args.database_type in ["RF","FR"]:
+                    logger.info("Split read names depending on 1/ or 2/")
+                    ReadNamesFile_Right = "%s/ReadNames.%d.1.txt" % (TmpDirName,i)
+                    ReadNamesFile_Left = "%s/ReadNames.%d.2.txt" % (TmpDirName,i)
+                    ReadFasta_Right = "%s/Reads.%d.1.fasta" % (TmpDirName,i)
+                    ReadFasta_Left = "%s/Reads.%d.2.fasta" % (TmpDirName,i)
+                    out, err = ApytramNeeds.split_readnames_in_right_left(ReadNamesFile,ReadNamesFile_Right,ReadNamesFile_Left)
+                    if err:
+                        logger.error(err)
+                    StrandList = [".1",".2"]
+                else:
+                    StrandList = [""]
+    
+                logger.info("Retrieve reads sequences")
+                start_blastdbcmd_time = time.time()
+                for strand in StrandList:
+                    ReadFasta = "%s/Reads.%d%s.fasta" % (TmpDirName,i,strand)
+                    ReadNamesFile = "%s/ReadNames.%d%s.txt" % (TmpDirName,i,strand)
+                    BlastdbcmdProcess = BlastPlus.Blastdbcmd(DatabaseName, ReadNamesFile, ReadFasta)
+                    if not os.path.isfile(ReadFasta):
+                        (out,err) = BlastdbcmdProcess.launch()
+                    else:
+                        logger.warn("%s has already been created, it will be used" %(ReadFasta) )
+    
+    
+                StatsDict[i]["BlastdbcmdTime"] += time.time() - start_blastdbcmd_time
+                logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
+    
+                ### Launch Trinity
+    
+                start_trinity_time = time.time()
+                logger.info("Launch Trinity")
+                ExitCode = 0
+                TrinityFasta = "%s/Trinity_iter_%d" %(TmpDirName, i)
+                if StrandedData:
+                    if args.database_type in ["RF","FR"]:
+                        TrinityProcess = Trinity.Trinity(TrinityFasta, right = ReadFasta_Right,
+                                                        left = ReadFasta_Left)
+                    else:
+                        TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
+                    TrinityProcess.SS_lib_type = args.database_type
+                else:
+                    TrinityProcess = Trinity.Trinity(TrinityFasta, single = ReadFasta)
+                    if PairedData:
+                        TrinityProcess.RunAsPaired = True
+                # If there is a huge number of reads, remove duplicated reads
+                if StatsDict[i]["ReadsNumber"] > 1000:
+                    TrinityProcess.NormalizeReads = True
+    
+                TrinityProcess.CPU = Threads
+                TrinityProcess.max_memory = Memory
+                # Keep only contig with a length superior to MinLength
+                TrinityProcess.MinLength = MinLength
+    
+                # Use the  --full_cleanup Trinity option to keep only the contig file
+                TrinityProcess.FullCleanup = True
+                if not os.path.isfile(TrinityFasta+".Trinity.fasta"):
+                    (out,err,ExitCode) = TrinityProcess.launch()
+                else:
+                    logger.warn("%s has already been created, it will be used" %(TrinityFasta+".Trinity.fasta") )
+    
+                TrinityFasta = TrinityFasta + ".Trinity.fasta"
+                StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
+                logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
+                if not os.path.isfile(TrinityFasta): # Trinity found nothing
+                    if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
+                        logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
+                        logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
+                    elif ExitCode != 0:
+                        logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
+                        logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %ExitCode)
+                    Stop = True
+                    IterationNotFinished = True
+                    i -=1
+                else:
+    
+                    ### Filter Trinity contigs to keep only homologous sequences of the reference genes
+    
+                    logger.info("Compare Trinity results with query sequences")
+                    # Use Exonerate
+                    TrinityExonerate = "%s/Trinity_iter_%d.exonerate_cdna2g" % (TmpDirName, i)
+                    start_exo_time = time.time()
+                    TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
+                    # Keep only the best hit for each contig from Trinity
+                    TrinityExonerateProcess.Bestn = 1
+                    TrinityExonerateProcess.Model = "cdna2genome"
+                    # Customize the output format
+                    TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+                    (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
+                    # Write the result in a file
+                    TrinityExonerateFile = open(TrinityExonerate,"w")
+                    TrinityExonerateFile.write(TrinityExonerateResult)
+                    TrinityExonerateFile.close()
+                    if not TrinityExonerateResult:
+                        logger.info("Reconstructed sequences but no homologous with references")
+                        logger.info("Try to get homologies with a more sensible model")
+                        ### Try to get homologies with a more sensible model
+                        TrinityExonerate = "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i)
+                        start_exo_time = time.time()
+                        TrinityExonerateProcess = Aligner.Exonerate(QueryFile,TrinityFasta)
+                        # Keep only the best hit for each contig from Trinity
+                        TrinityExonerateProcess.Bestn = 1
+                        TrinityExonerateProcess.Model = "coding2genome"
+                        # Customize the output format
+                        TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+                        (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
+                        # Write the result in a file
+                        TrinityExonerateFile = open(TrinityExonerate,"w")
+                        TrinityExonerateFile.write(TrinityExonerateResult)
+                        TrinityExonerateFile.close()
+    
+                    if not TrinityExonerateResult:
+                        logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
+                        Stop = True
+                        IterationNotFinished = True
+                        i -= 1
+                    else:
+                        # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
+                        BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
+                                                minalilength = MinAliLength)
+                        StatsDict[i].update(StatsIter)
+                        FilteredSequenceNames = TrinityExonerateResultsDict.keys()
+                        StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
+                        logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
+    
+                        # Write filtered sequences in a file
+                        logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength))
+                        FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, i)
+                        ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames, FileteredTrinityFasta,
+                                                            ReverseNames = ReverseNames)
+    
+                        ### Validated sequences become bait sequences
+    
+                        BaitSequences = FileteredTrinityFasta
+                        if not os.stat(BaitSequences).st_size:
+                            logger.warning("No sequence has passed the iteration filter at the iteration %s" %(i))
+                            Stop = True
+                            IterationNotFinished = True
+                            i -=1
+                        else:
+                            ### Compare sequences of the current iteration to those of the previous iteration
+    
+                            logger.info("Compare results with the previous iteration")
+    
+                            #Check if the number of contigs has changed
+    
+                            logger.info("Check if the number of contigs has changed")
+                            StatsDict[i]["NbContigs"] = len(FilteredSequenceNames)
+    
+                            if StatsDict[i]["NbContigs"] != StatsDict[i-1]["NbContigs"]:
+                                logger.info("The number of contigs has changed")
+                            elif i >= 2:
+                                logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
+                                # Use Exonerate to compare the current iteration with the previous
+                                start_exo_time = time.time()
+                                ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
+                                # Keep only the best hit for each contigs
+                                Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
+                                ExonerateProcess.Bestn = 1
+                                ExonerateProcess.Model =  "est2genome"
+                                # Customize the output format
+                                ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
+                                (out,err,ExonerateResult) = ExonerateProcess.get_output()
+                                ExonerateFile = open(Exonerate,"w")
+                                ExonerateFile.write(ExonerateResult)
+                                ExonerateFile.close()
+                                AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
+                                if AlmostIdenticalResults and not FinishAllIter:
+                                    logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
+                                    Stop =True
+                                StatsDict[i]["Exonerate2Time"] = time.time() - start_exo_time
+                                logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict[i]["Exonerate2Time"]))
+    
+                            # Check that the coverage has increased compared to the previous iteration
+    
+                            logger.info("Check that the coverage has inscreased compared to the previous iteration")
+                            # Use Mafft
+                            start_mafft_time = time.time()
+                            MafftProcess = Aligner.Mafft(AliQueryFile)
+                            MafftProcess.QuietOption = True
+                            MafftProcess.AutoOption = True
+                            #MafftProcess.AdjustdirectionOption = True
+                            MafftProcess.AddOption = FileteredTrinityFasta
+                            (MafftResult,err) = MafftProcess.get_output()
+                            StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
+                            logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"]))
+                            StatsDict[i]["MafftTime"] = time.time() - start_mafft_time
+                            logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
+    
+                            if not FinishAllIter:
+                                # Stop iteration if both Largecoverage and Total length are not improved
+                                if StatsDict[i]["AverageLength"] > StatsDict[i-1]["AverageLength"]:
+                                    pass
+                                elif StatsDict[i]["AverageScore"] > StatsDict[i-1]["AverageScore"]:
+                                    pass
+                                elif StatsDict[i]["TotalLength"] > StatsDict[i-1]["TotalLength"]:
+                                    pass
+                                elif StatsDict[i]["TotalScore"] > StatsDict[i-1]["TotalScore"]:
+                                    pass
+                                elif StatsDict[i]["BestScore"] > StatsDict[i-1]["BestScore"]:
+                                    pass
+                                elif StatsDict[i]["LargeCoverage"] <= StatsDict[i-1]["LargeCoverage"]:
+                                    logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
+                                    Stop = True
+    
+                                # Stop iteration if the RequiredCoverage is reached
+                                if StatsDict[i]["StrictCoverage"] >= RequiredCoverage:
+                                    logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[i]["StrictCoverage"],RequiredCoverage))
+                                    Stop = True
+    
+    
+                            # Remove tmp file from the i-2 iteration
+                            if i>2:
+                                ApytramNeeds.tmp_dir_clean_up(TmpDirName,i-2)
+    
+                            ### Write a fasta file for this iteration if the option --keep_iterations was selected
+                            if KeepIterations:
+                                if not args.no_best_file:
+                                # Best sequences of the iteration
+                                    ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
+                                                                    "%s.iter_%d.best.fasta" %(OutPrefixName,i),
+                                                                    Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                                    Names = BestScoreNames.values(),
+                                                                    Message = "iter_%d.best." %i)
+                                # All sequences of the iteration
+                                ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
+                                                                TrinityExonerateResultsDict,
+                                                                "%s.iter_%d.fasta" %(OutPrefixName,i),
+                                                                Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                                Message = "iter_%d." %i)
+                                # Mafft alignment
+                                ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
+    
+        if IterationNotFinished:
+                logger.debug("Iteration stop before end")
+                Reali = i + 1
+        else:
+            Reali = i
+    
+        NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
+                    StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
+                    StatsDict[Reali]["Exonerate2Time"]
+        StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
+                                "CumulTime": time.time() - start_time,
+                                "PythonTime": time.time() - start_iter_i - NoPythonTime })
+        logger.debug("iteration %d --- %s seconds ---" % (Reali, time.time() - start_iter_i))
+    
+        if (time.time() - start_time) > MaxTime and Stop == False:
+            logger.warn("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
+            Stop = True
+    
+    
+    
+    logger.info("End of Iterations. Iterative process takes %s seconds." %(time.time() - start_iter))
+    start_output = time.time()
+    if i: #We check that there is at least one iteration with a result
+        if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
+            start_iter_i = time.time()
+            Reali +=1
+            #### Final filter which is equivalent at a new iteration
+            StatsDict[Reali] = StatsDict[Reali-1].copy()
+            StatsDict[Reali].update({"IterationTime": 0,
+                        "CumulTime": 0,
+                        "BlastTime": 0,
+                        "BlastdbcmdTime": 0,
+                        "TrinityTime": 0,
+                        "Exonerate1Time":0,
+                        "Exonerate2Time":0,
+                        "MafftTime":0,
+                        "PythonTime":0,
+                        })
+    
+            # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
+            BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
+                                            FinalMinIdentityPercentage,
+                                            minalilengthpercentage = FinalMinAliLength,
+                                            minlengthpercentage = FinalMinLength)
+            StatsDict[Reali].update(StatsIter)
+            FilteredSequenceNames = TrinityExonerateResultsDict.keys()
+            logger.info("Filter sequence with a identity percentage superior to %d and a percentage alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
+    
+            if FilteredSequenceNames: # If sequences pass the last filter
+                # Write Filter hit
+                FileteredTrinityFasta =  "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName, Reali+1)
+                ExitCode = ApytramNeeds.filter_fasta(TrinityFasta, FilteredSequenceNames,
+                                                    FileteredTrinityFasta, ReverseNames = ReverseNames)
+    
+        start_output = time.time()
+        if FilteredSequenceNames: # If sequences pass the last filter
+            StatsDict[Reali]["NbContigs"] = len(FilteredSequenceNames)
+            #### Write output files
+            logger.info("Write outputfiles")
+            if not args.no_best_file:
+                # Best sequences
+                ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
+                                                            OutPrefixName+".best.fasta",
+                                                            Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                            Names = BestScoreNames.values(),
+                                                            Message = "best_")
+            if not args.only_best_file:
+                # Last iteration seqeunces
+                ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
+                                                            TrinityExonerateResultsDict,
+                                                            OutPrefixName+".fasta",
+                                                            Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
+                                                            Names = FilteredSequenceNames)
+    
+            if args.plot_ali or args.stats:
+                ### Calculate the coverage
+                logger.info("Calculate the final coverage")
+                # Use Mafft
+                start_mafft_time = time.time()
+                MafftProcess = Aligner.Mafft(AliQueryFile)
+                MafftProcess.QuietOption = True
+                MafftProcess.AutoOption = True
+                #MafftProcess.AdjustdirectionOption = True
+                MafftProcess.AddOption = OutPrefixName+".fasta"
+                (MafftResult,err) = MafftProcess.get_output()
+                StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
+                logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
+                StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
+                logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
+    
+                NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
+                    StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
+                    StatsDict[Reali]["Exonerate2Time"]
+                StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
+                                            "CumulTime": time.time() - start_time,
+                                            "PythonTime": time.time() - start_iter_i - NoPythonTime })
+    
+        # Stats files
+    
+        if args.plot_ali:
+            start_output_ali = time.time()
+            LengthAlignment = len(DicPlotCov[DicPlotCov.keys()[0]])
+            if LengthAlignment <= 3100:
+                logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
+                ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
+            else:
+                logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")
+            logger.info("Write the final alignment in OutPrefix.ali.fasta")
+            ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
+            logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
+    
+    else:
+        logger.warn("No results")
+    
+    if args.stats:
+        start_output_stat = time.time()
+        logger.info("Write statistics file (OutPrefix.stats.csv)")
+        ApytramNeeds.write_stats(StatsDict,OutPrefixName)
+    
+        if args.plot:
+            logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
+            ApytramNeeds.create_plot(StatsDict, OutPrefixName)
+            logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
+    
+    
+    logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
+    logger.info("--- %s seconds ---" % (time.time() - start_time))
+    
+    
+logger.warning("END")
+ApytramClasses.end(0,TmpDirName)
