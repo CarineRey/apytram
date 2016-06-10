@@ -64,7 +64,7 @@ def cat_fasta(FastaFiles,CatFastaFile):
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE,
                           shell = True)
-    out, err = p.communicate()
+    (out, err) = p.communicate()
     return (out, err)
     
 def reverse_complement(Sequence):

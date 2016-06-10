@@ -122,7 +122,9 @@ class RNA_species:
 
         # Intermediary files
 
-        self.ReadsNamesFiles = ""
+        self.ReadNamesFile = ""
+        self.TrinityFasta = ""
+        self.FileteredTrinityFasta = ""
 
     def has_a_formated_database(self):
         CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName,"","")
@@ -235,15 +237,31 @@ class RNA_species:
 
     def new_iteration(self,iter_time):
         # Cleaning
+        
+        # Previous Iteration
+        self.PreviousReadNamesFile = self.ReadNamesFile
+        self.PreviousFileteredTrinityFasta = self.FileteredTrinityFasta
 
         # New names files
         self.CurrentIteration +=1
+        self.Improvment = True
+        self.CompletedIteration = True
 
-        self.ReadsNamesFiles = "%s/ReadNames.%d.txt" %(self.TmpDirName,self.CurrentIteration)
+        self.ReadNamesFile = "%s/ReadNames.%d.txt" %(self.TmpDirName,self.CurrentIteration)
+        self.ReadsNumber = 0
+        
+        self.ReadNamesFile_Right = "%s/ReadNames.%d.1.txt" % (self.TmpDirName,self.CurrentIteration)
+        self.ReadNamesFile_Left  = "%s/ReadNames.%d.2.txt" % (self.TmpDirName,self.CurrentIteration)
+        self.ReadFasta_Right     = "%s/Reads.%d.1.fasta"   % (self.TmpDirName,self.CurrentIteration)
+        self.ReadFasta_Left      = "%s/Reads.%d.2.fasta"   % (self.TmpDirName,self.CurrentIteration)
+        
+        self.ReadFasta      = "%s/Reads.%d.fasta"   % (self.TmpDirName,self.CurrentIteration)
+                    
         self.TrinityFasta = "%s/Trinity_iter_%d" %(self.TmpDirName,self.CurrentIteration)
+        self.FileteredTrinityFasta = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
 
         self.TrinityExonerate = "%s/Trinity_iter_%d.exonerate_cdna2g" %(self.TmpDirName,self.CurrentIteration)
-
+		
 
 
 
@@ -252,12 +270,28 @@ class RNA_species:
 #### query class
 
 class Query:
-    def __init__(self,QueryPath):
-        self.Name = ""
+    def __init__(self,Name,QueryPath):
+        self.Name = Name
         self.RawQuery = QueryPath
         self.SequenceNb = ApytramNeeds.count_sequences(QueryPath)
+        
 
         self.AlignedQuery = ""
+        
+        
+        self.CumulIteration = 0
+        self.AbsIteration = 0
+        
+        self.Improvment = True
+        self.BaitSequences = ""
+        self.PreviousBaitSequences = ""
+        
+    def add_BaitSequences(self, new_bait_sequences):
+		self.PreviousBaitSequences = self.BaitSequences
+		self.BaitSequences = "%s/BaitSequences.%d.fasta" %(self.TmpDirName, self.CumulIteration)
+		ApytramNeeds.cat_fasta("%s %s" %(new_bait_sequences, self.PreviousBaitSequences), self.BaitSequences)
+        
+        
 
 
 
