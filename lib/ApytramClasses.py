@@ -41,22 +41,11 @@ import numpy as np
 import sys
 import subprocess
 import time
-import shutil
+
 
 from lib import BlastPlus
+from lib import Trinity
 from lib import ApytramNeeds
-
-
-# Function to end apytram in removing temporary directory
-
-def end(exit_code,TmpDirName,logger=""):
-    ### Remove tempdir if the option --tmp have not been use
-    if logger:
-        logger.debug("Remove the temporary directory")
-    #Remove the temporary directory :
-    if "tmp_apytram" in TmpDirName:
-        shutil.rmtree(TmpDirName)
-    sys.exit(exit_code)
 
 
 #### Execution stats class
@@ -100,7 +89,8 @@ class Exec_stats:
 #### RNA sample class
 
 class RNA_species:
-    def __init__(self,start_time):
+    def __init__(self,start_time,logger):
+        self.logger = logger
         self.Species = ""
         self.OutputPrefix = ""
         self.TmpDirName = ""
@@ -115,10 +105,19 @@ class RNA_species:
         self.DatabaseType = "" # ["single","paired","FR","RF","F","R"]
         self.StrandedData = False # True/False
         self.PairedData = False # True/False
+        self.Evalue = 0
+        self.MinLength = 0
+		self.MinIdentityPercentage = 0
+		self.MinAliLength = 0
+		self.FinalMinLength = 0
+		self.FinalMinIdentityPercentage = 0
+		self.FinalMinAliLength = 0
 
         self.ExecutionStats = Exec_stats(start_time)
         self.CurrentIteration = 0
         self.FinalIteration = 0
+        self.Improvment = True
+        self.CompletedIteration = True
 
         # Intermediary files
 
@@ -130,35 +129,35 @@ class RNA_species:
         CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName,"","")
         return CheckDatabase_BlastdbcmdProcess.is_database()
 
-    def set_TmpDir(self,TmpDirName,logger):
+    def set_TmpDir(self,TmpDirName):
         self.TmpDirName = TmpDirName + "/" + self.Species
         if not os.path.isdir(self.TmpDirName):
-            logger.info("The temporary directory %s does not exist, it will be created" % (self.TmpDirName))
+            self.logger.info("The temporary directory %s does not exist, it will be created" % (self.TmpDirName))
             os.makedirs(self.TmpDirName)
 
-    def set_OutputDir(self,OutPrefixName,logger):
+    def set_OutputDir(self,OutPrefixName):
         ### Set up the output directory
         if OutPrefixName:
             OutDirName = os.path.dirname(OutPrefixName)
             if os.path.isdir(OutDirName):
-                logger.info("The output directory %s exists" %(OutDirName) )
+                self.logger.info("The output directory %s exists" %(OutDirName) )
             elif OutDirName: # if OutDirName is not a empty string we create the directory
-                logger.info("The output directory %s does not exist, it will be created" % (OutDirName))
+                self.logger.info("The output directory %s does not exist, it will be created" % (OutDirName))
                 os.makedirs(OutDirName)
         self.OutDirPrefix = OutPrefixName
 
-    def build_database(self,FreeSpaceTmpDir,TmpDirName,logger):
+    def build_database(self,FreeSpaceTmpDir,TmpDirName):
         logger.info("Database %s does not exist for the species: %s" % (self.DatabaseName, self.Species))
         self.DatabaseDirName = os.path.dirname(self.DatabaseName)
         if os.path.isdir(self.DatabaseDirName) or not self.DatabaseDirName :
-            logger.info("Database directory exists")
+            self.logger.info("Database directory exists")
         else:
-            logger.info("Database directory does not exist, we create it")
+            self.logger.info("Database directory does not exist, we create it")
             os.makedirs(self.DatabaseDirName)
 
         #Get the available free space of the DB dir
         FreeSpaceDBDir = ApytramNeeds.get_free_space(self.DatabaseDirName)
-        logger.debug("%s free space in %s" %(FreeSpaceDBDir,self.DatabaseDirName))
+        self.logger.debug("%s free space in %s" %(FreeSpaceDBDir,self.DatabaseDirName))
 
         #Concatenate input files
         if self.Fastq:
@@ -168,45 +167,45 @@ class RNA_species:
                     end(1,TmpDirName)
                 # Format the fastq file in fasta
             self.InputFasta = "%s/input_fastq.fasta" %(self.TmpDirName)
-            logger.info("Convert the fastq file in fasta format")
+            self.logger.info("Convert the fastq file in fasta format")
             start_convert = time.time()
             input_size = ApytramNeeds.get_size(self.Fastq)
-            logger.debug("size of input files: %s " %input_size)
+            self.logger.debug("size of input files: %s " %input_size)
             if input_size*1.1 > FreeSpaceTmpDir:
-                logger.error("Not enough available free space in %s to convert input files" %TmpDirName)
+                self.logger.error("Not enough available free space in %s to convert input files" %TmpDirName)
                 end(1,TmpDirName)
             if input_size*2.5 > FreeSpaceDBDir:
-                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
+                self.logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
                 end(1,TmpDirName)
             (out,err) = ApytramNeeds.fastq2fasta(" ".join(self.Fastq),self.InputFasta)
             if err:
-                logger.error(err)
+                self.logger.error(err)
                 end(1,TmpDirName)
-            logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
+            self.logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif self.Fasta:
             for fasta in self.Fasta:
                 if not os.path.isfile(fasta):
-                    logger.error("The fasta file (%s) does not exist." %fasta)
+                    self.logger.error("The fasta file (%s) does not exist." %fasta)
                     end(1,TmpDirName)
             # Check enough available free space
             input_size = ApytramNeeds.get_size(self.Fasta)
-            logger.debug("size of input files: %s " %input_size)
+            self.logger.debug("size of input files: %s " %input_size)
             if input_size*2.5 > FreeSpaceDBDir:
-                logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
+                self.logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
                 end(1,TmpDirName)
             # Concatenate fasta files
             if len(self.Fasta) > 1:
                 if input_size*1.1 > FreeSpaceTmpDir:
-                    logger.error("Not enough available free space in %s to concatenate input files" %TmpDirName)
+                    self.logger.error("Not enough available free space in %s to concatenate input files" %TmpDirName)
                     end(1,TmpDirName)
                 self.InputFasta = "%s/input_fasta.fasta" %(self.TmpDirName)
-                logger.info("Concatenate fasta files")
+                self.logger.info("Concatenate fasta files")
                 start_convert = time.time()
                 (out,err) = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFasta)
                 if err:
-                    logger.error(err)
+                    self.logger.error(err)
                     end(1,TmpDirName)
-                logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
+                self.logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
             else:
                 self.InputFasta = self.Fasta[0]
 
@@ -214,26 +213,26 @@ class RNA_species:
         if self.PairedData:
             BadReadName = ApytramNeeds.check_paired_data(self.InputFasta)
             if BadReadName:
-                logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %(BadReadName))
+                self.logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %(BadReadName))
                 end(1,TmpDirName)
         #Build blast formated database from a fasta file
         if not os.path.isfile(self.InputFasta):
-            logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFasta))
+            self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFasta))
             end(1,TmpDirName)
 
         # Database building
-        logger.info(self.DatabaseName + " database building")
+        self.logger.info(self.DatabaseName + " database building")
         MakeblastdbProcess = BlastPlus.Makeblastdb(self.InputFasta,self.DatabaseName)
         (out,err) = MakeblastdbProcess.launch()
 
         self.FormatedDatabase = self.has_a_formated_database()
 
         if not self.FormatedDatabase:
-            logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
-            logger.info("Database %s does not exist" % self.DatabaseName)
+            self.logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
+            self.logger.info("Database %s does not exist" % self.DatabaseName)
             end(1,TmpDirName)
         else:
-            logger.info("Database %s exists" % self.DatabaseName)
+            self.logger.info("Database %s exists" % self.DatabaseName)
 
     def new_iteration(self,iter_time):
         # Cleaning
@@ -261,8 +260,85 @@ class RNA_species:
         self.FileteredTrinityFasta = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
 
         self.TrinityExonerate = "%s/Trinity_iter_%d.exonerate_cdna2g" %(self.TmpDirName,self.CurrentIteration)
-		
+    
+    def launch_Blastn(self,BaitSequences,Threads):
+            BlastnProcess = BlastPlus.Blast("blastn", self.DatabaseName, BaitSequences)
+            BlastnProcess.Evalue = self.Evalue
+            BlastnProcess.Task = "blastn"
+            BlastnProcess.Threads = Threads
+            BlastnProcess.OutFormat = "6 sacc"
+            
+            (out,err) = BlastnProcess.launch(self.ReadNamesFile)
 
+    def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
+        if self.DatabaseType in ["RF","FR"]:
+            self.logger.info("Split read names depending on 1/ or 2/")
+            (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ReadNamesFile,self.ReadNamesFile_Right,self.ReadNamesFile_Left)
+            if err:
+                self.logger.error(err)
+            StrandList = [".1",".2"]
+        else:
+            StrandList = [""]
+        
+        self.logger.info("Retrieve reads sequences")
+        start_blastdbcmd_time = time.time()
+        for strand in StrandList:
+            ReadFasta = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration,strand)
+            ReadNamesFile = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration,strand)
+            BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, ReadNamesFile, ReadFasta)
+            if not os.path.isfile(ReadFasta):
+                (out,err) = BlastdbcmdProcess.launch()
+            else:
+                self.logger.warn("%s has already been created, it will be used" %(ReadFasta) )
+                
+        #StatsDict[i]["BlastdbcmdTime"] += time.time() - start_blastdbcmd_time
+        #self.logger.debug("blastdbcmd --- %s seconds ---" %(time.time() - start_blastdbcmd_time))
+        
+    def launch_Trinity(self,Threads, Memory):
+        start_trinity_time = time.time()
+        self.logger.info("Launch Trinity")
+        ExitCode = 0
+        if self.StrandedData:
+            if self.DatabaseType in ["RF","FR"]:
+                TrinityProcess = Trinity.Trinity(self.TrinityFasta, right = self.ReadFasta_Right,
+                                                left = self.ReadFasta_Left)
+            else:
+                TrinityProcess = Trinity.Trinity(self.TrinityFasta, single = self.ReadFasta)
+            
+            TrinityProcess.SS_lib_type = self.DatabaseType
+        else:
+            TrinityProcess = Trinity.Trinity(self.TrinityFasta, single = self.ReadFasta)
+            if self.PairedData:
+                TrinityProcess.RunAsPaired = True
+        # If there is a huge number of reads, remove duplicated reads
+        if self.ReadsNumber > 1000:
+            TrinityProcess.NormalizeReads = True
+        
+        TrinityProcess.CPU = Threads
+        TrinityProcess.max_memory = Memory
+        # Keep only contig with a length superior to MinLength
+        TrinityProcess.MinLength = self.MinLength
+        
+        # Use the  --full_cleanup Trinity option to keep only the contig file
+        TrinityProcess.FullCleanup = True
+        if not os.path.isfile(self.TrinityFasta+".Trinity.fasta"):
+            (out,err,ExitCode) = TrinityProcess.launch()
+        else:
+            self.logger.warn("%s has already been created, it will be used" %(self.TrinityFasta+".Trinity.fasta") )
+        
+        self.TrinityFasta = self.TrinityFasta + ".Trinity.fasta"
+        
+        if not os.path.isfile(self.TrinityFasta):
+            if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
+               self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
+               self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
+            elif ExitCode != 0:
+               self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
+               self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
+        
+        #StatsDict[i]["TrinityTime"] = time.time() - start_trinity_time
+        #self.logger.debug("trinity --- %s seconds ---" %(StatsDict[i]["TrinityTime"]))
+    
 
 
 
@@ -283,13 +359,21 @@ class Query:
         self.AbsIteration = 0
         
         self.Improvment = True
+        self.SpeciesWithoutImprovment = {0:[]}
         self.BaitSequences = ""
         self.PreviousBaitSequences = ""
         
+    def continue_iter(self):
+        NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
+        if NbSpeciesWithoutImprovment == self.NbSpecies:
+            return(False)
+        else:
+            return(True)
+    
     def add_BaitSequences(self, new_bait_sequences):
-		self.PreviousBaitSequences = self.BaitSequences
-		self.BaitSequences = "%s/BaitSequences.%d.fasta" %(self.TmpDirName, self.CumulIteration)
-		ApytramNeeds.cat_fasta("%s %s" %(new_bait_sequences, self.PreviousBaitSequences), self.BaitSequences)
+        self.PreviousBaitSequences = self.BaitSequences
+        self.BaitSequences = "%s/BaitSequences.%d.fasta" %(self.TmpDirName, self.CumulIteration)
+        ApytramNeeds.cat_fasta("%s %s" %(new_bait_sequences, self.PreviousBaitSequences), self.BaitSequences)
         
         
 

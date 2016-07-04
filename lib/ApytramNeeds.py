@@ -36,6 +36,7 @@
 
 import os
 import re
+import shutil
 import string
 import numpy as np
 import sys
@@ -47,6 +48,19 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 #matplotlib.style.use('ggplot')
 
+
+# Function to end apytram in removing temporary directory
+
+def end(exit_code,TmpDirName,logger=""):
+    ### Remove tempdir if the option --tmp have not been use
+    if logger:
+        logger.debug("Remove the temporary directory")
+    #Remove the temporary directory :
+    if "tmp_apytram" in TmpDirName:
+        shutil.rmtree(TmpDirName)
+    sys.exit(exit_code)
+    
+    
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
     command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
@@ -86,24 +100,31 @@ def write_in_file(String,Filename,mode = "w"):
         File.write(String)
         File.close()   
     
-def add_paired_read_names(File):
+def add_paired_read_names(File, logger = ""):
     "Add paired read name to a read name list"
     if os.path.isfile(File):
         command1 = """awk '{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}' %s  | sort -u > %s """ %(File, File+".paired")
         command2 = "mv %s %s" %(File+".paired", File)
-    p1 = subprocess.Popen(command1,
+        
+        p1 = subprocess.Popen(command1,
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE,
                           shell = True)
-    out1, err1 = p1.communicate()
-    p2 = subprocess.Popen(command2,
+        (out1, err1) = p1.communicate()
+        if not err1:
+            p2 = subprocess.Popen(command2,
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE,
                           shell = True)
-    out2, err2 = p2.communicate()
-    return (out1+"\n"+out2, err1+"\n"+err2)
+            (out2, err2) = p2.communicate()
+            if err2 and logger:
+                logger.error(err2)
+        elif logger:
+            logger.error(err1)
+    elif logger:
+        logger.error("%s is not a file" %(File))
 
-def remove_duplicated_read_names(File):
+def remove_duplicated_read_names(File,logger = ""):
     "remove duplicated read names"
     if os.path.isfile(File):
         command1 = """sort -u %s > %s""" %(File, File+".uniq")
@@ -112,15 +133,20 @@ def remove_duplicated_read_names(File):
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE,
                               shell = True)
-        out1, err1 = p1.communicate()
-        p2 = subprocess.Popen(command2,
+        (out1, err1) = p1.communicate()
+        if not err1:
+            p2 = subprocess.Popen(command2,
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE,
                               shell = True)
-        out2, err2 = p2.communicate()
-        return (out1+"\n"+out2, err1+"\n"+err2)
-    else:
-        return ("","File %s is not a valid path" %File)
+            (out2, err2) = p2.communicate()
+            if err2 and logger:
+                logger.error(err2)
+        elif logger:
+            logger.error(err1)
+
+    elif logger:
+        logger.error("File %s is not a valid path" %File)
 
 def tmp_dir_clean_up(TmpDirName,i):
     if i == 1 :
