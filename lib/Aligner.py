@@ -74,7 +74,7 @@ class Exonerate:
         p = subprocess.Popen(command,
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
-        out, err = p.communicate()
+        (out, err) = p.communicate()
         if err:
             self.logger.error("Unexpected error when we launch Exonerate:\n")
             self.logger.error(err)
@@ -119,7 +119,7 @@ class Mafft:
         p = subprocess.Popen(command,
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
-        out, err = p.communicate()
+        (out, err) = p.communicate()
         if err:
             self.logger.error("Unexpected error when we launch Mafft:\n")
             self.logger.error(err)

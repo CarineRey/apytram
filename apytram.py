@@ -455,6 +455,9 @@ if error:
     ApytramNeeds.end(1,TmpDirName)
 
 
+logger.debug("Time to parse input command line: %s" %(time.time() - start_time))
+
+
 
 # ### If iteration begin not from 1, the temporary directory must be given by the user
 # if StartIteration != 1 and not args.tmp:
@@ -494,31 +497,24 @@ else:
 
 for Query in QueriesList:
     Query.OutPrefixName = "%s_%s" %(OutPrefixName,Query.Name)
-    Query.BaitSequences = Query.RawQuery
     Query.NbSpecies = len(SpeciesNamesList)
-
+    Query.StartTime = time.time()
+    #Iterative process
     while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()):
         Query.AbsIteration +=1
         Query.SpeciesWithoutImprovment[Query.AbsIteration] = []       
         logger.info("Iteration %d/%d" %(Query.AbsIteration,MaxIteration))
 
         for Species in SpeciesList:
-            Query.CumulIteration +=1
+            # Build new baitsequences file
+            Query.new_species_iteration(SpeciesList)
             
             ### Make iterations
             # Initialisation
-            start_iter_i = time.time()
-            Species.new_iteration(start_iter_i)
-
-            logger.info("Iteration %d/%d for %s" %(Species.CurrentIteration, MaxIteration, Species.Species))
-            start_iter = time.time()
-
+            Species.new_iteration()
+            logger.info("Start iteration %d/%d for %s" %(Species.CurrentIteration, MaxIteration, Species.Species))
 
             ### Blast bait sequences on database of reads
-
-            logger.info("Blast bait sequences on reads database")
-            start_blast_time = time.time()
-            
             # Write read names in ReadNamesFile if the file does not exist
             if not os.path.isfile(Species.ReadNamesFile):
                 Species.launch_Blastn(Query.BaitSequences,Threads)
@@ -540,6 +536,7 @@ for Query in QueriesList:
             # Count the number of reads which will be used in the Trinity assembly
             logger.info("Count the number of reads")
             Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFile)
+            Species.add_iter_statistic("ReadsNumber",Species.ReadsNumber)
             #StatsDict[i]["ReadsNumber"] = Species.ReadsNumber
 
             if not Species.ReadsNumber:
@@ -569,145 +566,78 @@ for Query in QueriesList:
                 if Species.Improvment:
                     ### Filter Trinity contigs to keep only homologous sequences of the reference genes
                     logger.info("Compare Trinity results with query sequences")
-                    # Use Exonerate
-                    start_exo_time = time.time()
-                    TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery,Species.TrinityFasta)
-                    # Keep only the best hit for each contig from Trinity
-                    TrinityExonerateProcess.Bestn = 1
-                    TrinityExonerateProcess.Model = "cdna2genome"
-                    # Customize the output format
-                    TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                    (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-                    # Write the result in a file
-                    ApytramNeeds.write_in_file(TrinityExonerateResult,Species.TrinityExonerate)
-                    if not TrinityExonerateResult:
-                        logger.info("Reconstructed sequences but no homologous with references")
-                        logger.info("Try to get homologies with a more sensible model")
-                        ### Try to get homologies with a more sensible model
-                        Species.TrinityExonerate = "%s/Trinity_iter_%d.exonerate_coding2g" %(Species.TmpDirName,Species.CurrentIteration)
-                        TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery,Species.TrinityFasta)
-                        # Keep only the best hit for each contig from Trinity
-                        TrinityExonerateProcess.Bestn = 1
-                        TrinityExonerateProcess.Model = "coding2genome"
-                        # Customize the output format
-                        TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-                        (out,err,TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-                        # Write the result in a file
-                        ApytramNeeds.write_in_file(TrinityExonerateResult,Species.TrinityExonerate)
-
-                    if not TrinityExonerateResult:
+                    Species.compare_trinity_results_with_references(Query)
+                    
+                    if not Species.TrinityExonerateResult:
                         logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
                         Species.Improvment = False
                         Species.CompletedIteration = False
 
                     if Species.Improvment:
                         # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
-                        (BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter) = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult, MinIdentityPercentage,
-                                                minalilength = MinAliLength)
-                        #StatsDict[i].update(StatsIter)
-                        FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-                        #StatsDict[i]["Exonerate1Time"] = time.time() - start_exo_time
-                        #logger.debug("exonerate on trinity --- %s seconds ---" % (StatsDict[i]["Exonerate1Time"]))
+                        # and write filtered sequences in a file
+                        Species.parse_and_filter_exonerate_results()
+                        
+                        ### Validated sequences (Species.FilteredTrinityFasta)  become bait sequences
 
-                        # Write filtered sequences in a file
-                        logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(MinIdentityPercentage, MinAliLength))
-                        ExitCode = ApytramNeeds.filter_fasta(Species.TrinityFasta, FilteredSequenceNames, Species.FileteredTrinityFasta, ReverseNames = ReverseNames)
-
-                        ### Validated sequences become bait sequences
-
-                        Query.add_BaitSequences(Species.FileteredTrinityFasta)
-                        if not os.stat(Query.BaitSequences).st_size:
-                            logger.warning("No sequence has passed the iteration filter at the iteration %s" %(i))
-                            Stop = True
-                            IterationNotFinished = True
-                            i -=1
+                        if not Species.FilteredSequenceNames:
+                            logger.warning("No sequence has passed the iteration filter at the iteration %s for %s" %(Species.CurrentIteration, Species.Species))
+                            Species.Improvment = False
+                            Species.CompletedIteration = False
+                        
                         else:
                             ### Compare sequences of the current iteration to those of the previous iteration
-
                             logger.info("Compare results with the previous iteration")
 
                             #Check if the number of contigs has changed
-
                             logger.info("Check if the number of contigs has changed")
-                            #StatsDict[i]["NbContigs"] = len(FilteredSequenceNames)
+                            
+                            Species.add_iter_statistic("NbContigs", len(Species.FilteredSequenceNames))
 
-                            #if StatsDict[i]["NbContigs"] != StatsDict[i-1]["NbContigs"]:
-                            #    logger.info("The number of contigs has changed")
-                            #elif i >= 2:
-                            #    logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
-                            #    # Use Exonerate to compare the current iteration with the previous
-                            #    start_exo_time = time.time()
-                            #    ExonerateProcess = Aligner.Exonerate(FileteredTrinityFasta, "%s/Trinity_iter_%d.filtered.fasta" % (TmpDirName,i-1) )
-                            #    # Keep only the best hit for each contigs
-                            #    Exonerate = "%s/iter_%d_%d.exonerate" % (TmpDirName, i-1, i)
-                            #    ExonerateProcess.Bestn = 1
-                            #    ExonerateProcess.Model =  "est2genome"
-                            #    # Customize the output format
-                            #    ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
-                            #    (out,err,ExonerateResult) = ExonerateProcess.get_output()
-                            #    ExonerateFile = open(Exonerate,"w")
-                            #    ExonerateFile.write(ExonerateResult)
-                            #    ExonerateFile.close()
-                            #    AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
-                            #    if AlmostIdenticalResults and not FinishAllIter:
-                            #        logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
-                            #        Stop =True
-                            #    StatsDict[i]["Exonerate2Time"] = time.time() - start_exo_time
-                            #    logger.debug("exonerate on previous iter --- %s seconds ---" % (StatsDict[i]["Exonerate2Time"]))
+                            if Species.get_iter_statistic("NbContigs") != Species.get_iter_statistic("NbContigs", RelIter = -1):
+                                logger.info("The number of contigs has changed")
+                            elif Query.AbsIteration >= 2:
+                                # Use Exonerate to compare the current iteration with the previous
+                                Species.compare_current_and_previous_iterations()
 
                             # Check that the coverage has increased compared to the previous iteration
 
                             logger.info("Check that the coverage has inscreased compared to the previous iteration")
-                            # Use Mafft
-                            start_mafft_time = time.time()
-                            MafftProcess = Aligner.Mafft(Query.AlignedQuery)
-                            MafftProcess.QuietOption = True
-                            MafftProcess.AutoOption = True
-                            #MafftProcess.AdjustdirectionOption = True
-                            MafftProcess.AddOption = Species.FileteredTrinityFasta
-                            (MafftResult,err) = MafftProcess.get_output()
-                            #StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
-                            #logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[i]["StrictCoverage"], StatsDict[i]["LargeCoverage"]))
-                            #StatsDict[i]["MafftTime"] = time.time() - start_mafft_time
-                            #logger.debug("mafft --- %s seconds ---" % (StatsDict[i]["MafftTime"]))
+                            Species.measure_coverage(Query)
 
-                            # if Species.CompletedIteration:
-                            #     # Stop iteration if both Largecoverage and Total length are not improved
-                            #     if StatsDict[i]["AverageLength"] > StatsDict[i-1]["AverageLength"]:
-                            #         pass
-                            #     elif StatsDict[i]["AverageScore"] > StatsDict[i-1]["AverageScore"]:
-                            #         pass
-                            #     elif StatsDict[i]["TotalLength"] > StatsDict[i-1]["TotalLength"]:
-                            #         pass
-                            #     elif StatsDict[i]["TotalScore"] > StatsDict[i-1]["TotalScore"]:
-                            #         pass
-                            #     elif StatsDict[i]["BestScore"] > StatsDict[i-1]["BestScore"]:
-                            #         pass
-                            #     elif StatsDict[i]["LargeCoverage"] <= StatsDict[i-1]["LargeCoverage"]:
-                            #         logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
-                            #         Species.Improvment = False
-                            #
-                            #     # Stop iteration if the RequiredCoverage is reached
-                            #     if StatsDict[i]["StrictCoverage"] >= RequiredCoverage:
-                            #         logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (StatsDict[i]["StrictCoverage"],RequiredCoverage))
-                            #         Species.Improvment = False
+                            if Species.CompletedIteration:
+                                 # Stop iteration if both Largecoverage and Total length are not improved
+                                 if Species.get_iter_statistic("AverageLength") != Species.get_iter_statistic("AverageLength", RelIter = -1):
+                                     pass
+                                 elif Species.get_iter_statistic("AverageScore") != Species.get_iter_statistic("AverageScore", RelIter = -1):
+                                     pass
+                                 elif Species.get_iter_statistic("TotalLength") != Species.get_iter_statistic("TotalLength", RelIter = -1):
+                                     pass
+                                 elif Species.get_iter_statistic("TotalScore") != Species.get_iter_statistic("TotalScore", RelIter = -1):
+                                     pass
+                                 elif Species.get_iter_statistic("BestScore") != Species.get_iter_statistic("BestScore", RelIter = -1):
+                                     pass
+                                 elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter = -1):
+                                     logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
+                                     Species.Improvment = False
+                            
+                                 # Stop iteration if the RequiredCoverage is reached
+                                 if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
+                                     logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (Species.get_iter_statistic("StrictCoverage"),RequiredCoverage))
+                                     Species.Improvment = False
 
-
-                            # Remove tmp file from the i-2 iteration
-                            #if i>2:
-                            #    ApytramNeeds.tmp_dir_clean_up(TmpDirName,i-2)
 
                             ### Write a fasta file for this iteration if the option --keep_iterations was selected
                             #if KeepIterations:
                             #    if not args.no_best_file:
                             #    # Best sequences of the iteration
-                            #        ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta, TrinityExonerateResultsDict,
+                            #        ExitCode = ApytramNeeds.write_apytram_output(FilteredTrinityFasta, TrinityExonerateResultsDict,
                             #                                        "%s.iter_%d.best.fasta" %(OutPrefixName,i),
                             #                                        Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                             #                                        Names = BestScoreNames.values(),
                             #                                        Message = "iter_%d.best." %i)
                             #    # All sequences of the iteration
-                            #    ExitCode = ApytramNeeds.write_apytram_output(FileteredTrinityFasta,
+                            #    ExitCode = ApytramNeeds.write_apytram_output(FilteredTrinityFasta,
                             #                                    TrinityExonerateResultsDict,
                             #                                    "%s.iter_%d.fasta" %(OutPrefixName,i),
                             #                                    Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
@@ -715,19 +645,18 @@ for Query in QueriesList:
                             #    # Mafft alignment
                             #    ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
 
+            
+            # End iteration
             Species.FinalIteration = Species.CurrentIteration
             if not Species.CompletedIteration:
-                    logger.debug("Iteration stop before end")
-                    Species.FinalIteration -= 1
-                    Query.SpeciesWithoutImprovment[Query.AbsIteration].append(Species.Species)
+                logger.debug("Iteration stop before end")
+                Species.FinalIteration -= 1
+                Query.SpeciesWithoutImprovment[Query.AbsIteration].append(Species.Species)
+     
+            Species.end_iteration() # just stop timer
 
-            #NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
-            #            StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
-            #            StatsDict[Reali]["Exonerate2Time"]
-            #StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
-            #                        "CumulTime": time.time() - start_time,
-            #                       "PythonTime": time.time() - start_iter_i - NoPythonTime })
-            logger.debug("iteration %s : %d --- %s seconds ---" % (Species.Species, Species.CurrentIteration, time.time() - start_iter_i))
+
+            logger.info("End of the iteration %s for %s : --- %s seconds ---" % (Species.CurrentIteration, Species.Species, Species.get_iter_statistic("IterationTime")))
 
         
             #if (time.time() - start_time) > MaxTime and Stop == False:
@@ -736,98 +665,47 @@ for Query in QueriesList:
 
 
 
-    logger.info("End of Iterations for %s. Iterative process takes %s seconds." %(Query.Name, time.time() - start_iter))
+    logger.info("End of Iterations for %s. Iterative process takes %s seconds." %(Query.Name, time.time() - Query.StartTime))
 
     ### Final filter
     start_output = time.time()
     for Species in SpeciesList:
 
         if Species.FinalIteration: #We check that there is at least one iteration with a result
-            if FinalMinLength or FinalMinIdentityPercentage or FinalMinAliLength:
+            if Species.FinalMinLength or Species.FinalMinIdentityPercentage or Species.FinalMinAliLength:
                 start_iter_i = time.time()
                 Species.new_iteration(start_iter_i)
-                #### Final filter which is equivalent at a new iteration
-                #StatsDict[Reali] = StatsDict[Reali-1].copy()
-                #StatsDict[Reali].update({"IterationTime": 0,
-                #            "CumulTime": 0,
-                #            "BlastTime": 0,
-                #            "BlastdbcmdTime": 0,
-                #            "TrinityTime": 0,
-                #            "Exonerate1Time":0,
-                #            "Exonerate2Time":0,
-                #            "MafftTime":0,
-                #            "PythonTime":0,
-                #            })
-
                 # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
-                (BestScoreNames, ReverseNames, TrinityExonerateResultsDict, StatsIter) = ApytramNeeds.parse_exonerate_results(TrinityExonerateResult,
-                                                                FinalMinIdentityPercentage,
-                                                minalilengthpercentage = FinalMinAliLength,
-                                                minlengthpercentage = FinalMinLength)
-                #StatsDict[Reali].update(StatsIter)
-                FilteredSequenceNames = TrinityExonerateResultsDict.keys()
-                logger.info("Filter sequence with a identity percentage superior to %d and a percentage alignment len %d" %(FinalMinIdentityPercentage, FinalMinAliLength))
-
-                if FilteredSequenceNames: # If sequences pass the last filter
-                    # Write Filter hit
-                    ExitCode = ApytramNeeds.filter_fasta(Species.PreviousFilteredTrinityFasta, Species.FilteredSequenceNames,
-                                                        FileteredTrinityFasta, ReverseNames = ReverseNames)
+                # and write filtered sequences in a file
+                Species.parse_and_filter_exonerate_results(final_iteration = True)
 
             start_output = time.time()
-            if FilteredSequenceNames: # If sequences pass the last filter
-                #StatsDict[Reali]["NbContigs"] = len(FilteredSequenceNames)
-                #### Write output files
-                logger.info("Write outputfiles")
-                if not args.no_best_file:
-                    # Best sequences
-                    ExitCode = ApytramNeeds.write_apytram_output(Species.FileteredTrinityFasta, TrinityExonerateResultsDict,
-                                                                Query.OutPrefixName+".best.fasta",
-                                                                Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                                Names = BestScoreNames.values(),
-                                                                Message = "best_")
-                if not args.only_best_file:
-                    # Last iteration sequences
-                    ExitCode = ApytramNeeds.write_apytram_output(Species.FileteredTrinityFasta,
-                                                                TrinityExonerateResultsDict,
-                                                                Query.OutPrefixName+".fasta",
-                                                                Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
-                                                                Names = FilteredSequenceNames)
+            if Species.FilteredSequenceNames: # If sequences pass the last filter
+                Species.add_iter_statistic("NbContigs", len(Species.FilteredSequenceNames))
+                #### Write fasta output files
+                Species.write_fasta_apytram_outputs(Query, no_best_file = args.no_best_file, only_best_file = args.only_best_file)
 
                 if args.plot_ali or args.stats:
                     ### Calculate the coverage
                     logger.info("Calculate the final coverage")
-                    # Use Mafft
-                    start_mafft_time = time.time()
-                    MafftProcess = Aligner.Mafft(Query.AlignedQuery)
-                    MafftProcess.QuietOption = True
-                    MafftProcess.AutoOption = True
-                    #MafftProcess.AdjustdirectionOption = True
-                    MafftProcess.AddOption = Query.OutPrefixName+".fasta"
-                    (MafftResult,err) = MafftProcess.get_output()
-                    #StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"], DicPlotCov = ApytramNeeds.calculate_coverage(MafftResult)
-                    #logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StatsDict[Reali]["StrictCoverage"], StatsDict[Reali]["LargeCoverage"]))
-                    #StatsDict[Reali]["MafftTime"] += time.time() - start_mafft_time
-                    logger.debug("mafft --- %s seconds ---" % (time.time() - start_mafft_time))
+                    Species.measure_coverage(Query)
 
-                    #NoPythonTime = StatsDict[Reali]["BlastTime"] + StatsDict[Reali]["TrinityTime"] +\
-                    #    StatsDict[Reali]["MafftTime"] + StatsDict[Reali]["Exonerate1Time"] +\
-                    #    StatsDict[Reali]["Exonerate2Time"]
-                    #StatsDict[Reali].update({"IterationTime": time.time() - start_iter_i,
-                    #                            "CumulTime": time.time() - start_time,
-                    #                            "PythonTime": time.time() - start_iter_i - NoPythonTime })
+
+
+            Species.end_iteration()
 
             # Stats files
 
             if args.plot_ali:
                 start_output_ali = time.time()
-                LengthAlignment = len(DicPlotCov[DicPlotCov.keys()[0]])
+                LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
                 if LengthAlignment <= 3100:
                     logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
-                    ApytramNeeds.create_plot_ali(DicPlotCov, OutPrefixName)
+                    ApytramNeeds.create_plot_ali(Species.DicPlotCov, Query.OutPrefixName + "_" + Species.Species)
                 else:
                     logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")
                 logger.info("Write the final alignment in OutPrefix.ali.fasta")
-                ApytramNeeds.write_in_file(MafftResult,"%s.ali.fasta" %OutPrefixName)
+                ApytramNeeds.write_in_file(Species.MafftResult,"%s.ali.fasta" %(Query.OutPrefixName + "_" + Species.Species))
                 logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
 
         else:
@@ -836,11 +714,13 @@ for Query in QueriesList:
         if args.stats:
             start_output_stat = time.time()
             logger.info("Write statistics file (OutPrefix.stats.csv)")
-            ApytramNeeds.write_stats(StatsDict,OutPrefixName)
+            Species.write_stats_csv(Query)
 
             if args.plot:
                 logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
-                ApytramNeeds.create_plot(StatsDict, Query.OutPrefixName)
+                ApytramNeeds.create_plot(Species.ExecutionStats.TimeStatsDict,
+                                         Species.ExecutionStats.IterStatsDict,
+                                         Query.OutPrefixName + "_" + Species.Species)
                 logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
 
 

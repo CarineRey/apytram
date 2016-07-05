@@ -306,7 +306,7 @@ def parse_exonerate_results(ExonerateResult, MinIdentityPercentage,
         IterStats["AverageLength"] = IterStats["TotalLength"] / NbContigs
         IterStats["AverageScore"] = IterStats["TotalScore"] / NbContigs
     
-    return BestScoreNames, ReverseNames, ExonerateResultsDict, IterStats
+    return (BestScoreNames, ReverseNames, ExonerateResultsDict, IterStats)
 
 def check_almost_identical_exonerate_results(ExonerateResult):
     "Return True if all hit have a hit with 99% > id and a len = 98% len query "
@@ -368,72 +368,29 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     OutFile.close()        
     return 0
 
-def write_apytram_output(FastaFile, ExonerateResultsDict, OutFastaFile, Header = None, Names = None, Message = ""):
-    "Return a fasta file with new names depending on the ExonerateResultsDict"
-    df = pandas.DataFrame(ExonerateResultsDict, index = Header)
-    File = open(FastaFile,"r")
-    Fasta = File.read().strip().split("\n")
-    File.close()
-    name = ""
-    sequence = ""
-    string_list = []
-    i = 1
 
-    for line in Fasta:
-        if re.match(">",line):
-            name = line.split()[0].replace(">","")
-            if (Names):
-                if name in Names:
-                    string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
-                    i+=1
-                else:
-                    name = ""
-            else:
-                string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
-                i+=1
-            
-        elif name != "":
-            string_list.append(line + "\n")
-        else:
-            pass
-    # Write sequences
-    OutFile = open(OutFastaFile,"w")
-    OutFile.write("".join(string_list))
-    OutFile.close()  
-    return 0
 
-def write_stats(StatsDict,OutPrefixName):
-    df = pandas.DataFrame(StatsDict).T
-    df.to_csv("%s.stats.csv" % OutPrefixName)
-
-def create_plot(StatsDict, OutPrefixName):
-    df = pandas.DataFrame(StatsDict).T
-    # Categorize columns
-    TimeColumns = []
-    OtherColumns = []
-    for col in df.columns:
-        if "Time" in col and col not in ["CumulTime","IterationTime"]:
-            TimeColumns.append(col)
-        else:
-            OtherColumns.append(col)
-        
-    with PdfPages("%s.stats.pdf" % OutPrefixName) as pdf:
+def create_plot(TimeStatsDict, IterStatsDict, OutPrefixName):
+    df_time = pandas.DataFrame(TimeStatsDict).T
+    df_iter = pandas.DataFrame(IterStatsDict).T
+  
+    with PdfPages("%s.stats.pdf" %(OutPrefixName)) as pdf:
         ### Plot 1 ###
-        df[OtherColumns].plot(subplots=True,
-                              grid = True,
-                              legend = "best",
-                              figsize=(10, 20),
-                              style = "-o")
+        df_iter.plot(subplots=True,
+                     grid = True,
+                     legend = "best",
+                     figsize=(10, 20),
+                     style = "-o")
         plt.xlabel('Iteration')
         pdf.savefig()
         plt.close()
         
         ### Plot 2 ###
-        df[TimeColumns].plot(kind ='bar',
-                             grid = True,
-                             figsize=(10, 10),
-                             stacked=True,
-                             legend = "best")
+        df_time.plot(kind ='bar',
+                     grid = True,
+                     figsize=(10, 10),
+                     stacked=True,
+                     legend = "best")
         plt.ylabel('seconds')
         plt.xlabel('Iteration')
         plt.title('Distribution of the execution time')
@@ -557,4 +514,4 @@ def calculate_coverage(Alignment, NbRefSeq = 1):
     #Percentage of positon in contigs on the number positon of the reference
     #It can be superior to 100 if the contigs are longer than the reference
     LargeCov=float(SumLargeRefCov)/float(SumRef) *100
-    return StrictCov, LargeCov, DicPlotCov
+    return (StrictCov, LargeCov, DicPlotCov)
