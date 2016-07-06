@@ -51,12 +51,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 # Function to end apytram in removing temporary directory
 
-def end(exit_code,TmpDirName,logger=""):
+def end(exit_code, TmpDirName, keep_tmp = False, logger=""):
     ### Remove tempdir if the option --tmp have not been use
     if logger:
         logger.debug("Remove the temporary directory")
     #Remove the temporary directory :
-    if "tmp_apytram" in TmpDirName:
+    if not keep_tmp and "apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
     sys.exit(exit_code)
     
@@ -368,7 +368,9 @@ def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
     OutFile.close()        
     return 0
 
-
+def write_stats(df_list, Output):
+    df = pandas.concat(df_list)
+    df.to_csv(Output, na_rep = "0.0",index=False)
 
 def create_plot(TimeStatsDict, IterStatsDict, OutPrefixName):
     df_time = pandas.DataFrame(TimeStatsDict).T

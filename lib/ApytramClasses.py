@@ -285,7 +285,6 @@ class RNA_species:
             self.add_time_statistic("DatabaseBuilding", start = start)
             self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
             
-
     def new_iteration(self):
         
         self.ExecutionStats.StartIterTime = time.time()
@@ -403,8 +402,7 @@ class RNA_species:
         
         self.add_time_statistic("Trinity", start = start)
         self.logger.debug("Trinity --- %s seconds ---" %(self.get_time_statistic("Trinity")))
-        
-    
+           
     def compare_trinity_results_with_references(self,Query):
         # Use Exonerate
         start = time.time()
@@ -463,7 +461,6 @@ class RNA_species:
             else:
                 ExitCode = ApytramNeeds.filter_fasta(self.PreviousFilteredTrinityFasta, self.FilteredSequenceNames, FilteredTrinityFasta, ReverseNames = ReverseNames)
     
-    
     def compare_current_and_previous_iterations():
         self.logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
         start = time.time()
@@ -504,9 +501,7 @@ class RNA_species:
         self.add_iter_statistic("StrictCoverage", StrictCoverage)
         self.add_iter_statistic("LargeCoverage", LargeCoverage)
         self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
-
-
-                            
+                      
     def end_iteration(self):
         iter_time = time.time() - self.ExecutionStats.StartIterTime
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["IterationTime"] = iter_time
@@ -572,12 +567,65 @@ class RNA_species:
                 # Write sequences
                 ApytramNeeds.write_in_file("".join(string_list),Query.OutPrefixName + "_" + self.Species + OutFastaExtension)
        
-    def write_stats_csv(self, Query):
-        OutPrefixName = Query.OutPrefixName 
+    def get_output_fasta(self, Query, fasta = "all"):
+        assert fasta in ["all","best"], "fasta must be all or best"
+        
+        "Return fasta files with new names depending on the self.ExonerateResultsDict and options"
+        self.logger.info("Prepare outputfiles for %s" %(self.Species))
+        OutputFastaExtensions = []
+        if fasta == "best":
+            # Best sequences
+            OutFastaExtension = ".best.fasta"
+            Message = self.Species + "_best_"
+            ValidatedNames = self.BestScoreNames.values()
+            
+        else:
+            # Last iteration sequences
+            OutFastaExtension = ".fasta"
+            Message = self.Species + "_"
+            ValidatedNames = self.FilteredSequenceNames
+        
+        Header = self.TrinityExonerateRyo.replace('%',"").replace("\n","").split()
+        df = pandas.DataFrame(self.TrinityExonerateResultsDict, index = Header)
+        
+        # read self.FilteredTrinity
+        File = open(self.FilteredTrinityFasta,"r")
+        Fasta = File.read().strip().split("\n")
+        File.close()
+        
+        name = ""
+        sequence = ""
+        string_list = []
+        i = 1
+        for line in Fasta:
+            if re.match(">",line):
+                name = line.split()[0].replace(">","")
+                if name in ValidatedNames:
+                    string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
+                    i+=1
+                else:
+                    name = ""                   
+            elif name != "":
+                string_list.append(line + "\n")
+            else:
+                pass
+
+        # Write sequences
+        return(string_list)
+       
+    def get_stats(self):
         df_time = pandas.DataFrame(self.ExecutionStats.TimeStatsDict)
         df_iter = pandas.DataFrame(self.ExecutionStats.IterStatsDict)
         df = pandas.concat([df_time,df_iter]).T
-        df.to_csv("%s.stats.csv" %(OutPrefixName))
+        df.insert(0, "Iteration", df.index)
+        df.insert(0, "Species", self.Species)
+        return([df])
+        
+
+		
+    
+ #   def new_query(self):
+        
 
 
 #### query class
@@ -595,14 +643,21 @@ class Query:
         self.CumulIteration = 0
         self.AbsIteration = 0
         
-        self.Improvment = True
+        self.Stop = False
         self.SpeciesWithoutImprovment = {0:[]}
         self.BaitSequences = ""
         self.PreviousBaitSequences = ""
         
+        self.BestOutFileContent = []
+        self.OutFileContent = []
+        self.StatsFileContent = []
+        
+        
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
         if NbSpeciesWithoutImprovment == self.NbSpecies:
+            return(False)
+        elif self.Stop:
             return(False)
         else:
             return(True)

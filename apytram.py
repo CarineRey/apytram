@@ -50,6 +50,36 @@ from lib import BlastPlus
 from lib import Trinity
 from lib import Aligner
 
+
+def strict_positive_integer(x):
+    x = int(x)
+    if type(x) != type(1) or x <= 0:
+        print type(x) != type(1) 
+        print x < 0
+        raise argparse.ArgumentTypeError("Must be an integer superior to 0")
+    return (x)
+
+def positive_integer(x):
+    x = int(x)
+    if type(x)!= type(1) or x < 0:
+        raise argparse.ArgumentTypeError("Must be a positive integer")
+    return (x)
+
+def strict_positive_float(x):
+    x =float(x)
+    if type(x)!= type(0.1) or x <= 0:
+        raise argparse.ArgumentTypeError("Must be an float superior to 0")
+    return (x)
+
+def positive_float(x):
+    x =float(x)
+    if type(x)!= type(0.1) or x < 0:
+        raise argparse.ArgumentTypeError("Must be an float superior to 0")
+    return (x)
+
+
+
+
 start_time = time.time()
 
 ### Option defining
@@ -95,18 +125,18 @@ QueryOptions.add_argument('-q', '--query',  type=str,
                             WARNING: Sequences must not contain "- * . "
                            """,
                            )
-QueryOptions.add_argument('-pep', '--query_pep',  type=str,
-                   default = "",
-                   help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
+#QueryOptions.add_argument('-pep', '--query_pep',  type=str,
+#                   default = "",
+#                   help = "Fasta file containing the query in the peptide format. It will be used at the first iteration as bait sequences to fish reads. It is compulsory to include also the query in nucleotide format (-q option)")
 ##############
 
 
 ##############
 IterationOptions = parser.add_argument_group('Number of iterations')
-IterationOptions.add_argument('-i', '--iteration_max',  type=int,
+IterationOptions.add_argument('-i', '--iteration_max',  type=strict_positive_integer,
                     help = "Maximum number of iterations. (Default 5)",
                     default = 5 )
-IterationOptions.add_argument('-i_start','--iteration_start',  type=int,
+IterationOptions.add_argument('-i_start','--iteration_start',  type=positive_integer,
                     help = "Number of the first iteration. If different of 1, the tmp option must be used. (Default: 1)",
                     default = 1 )
 ##############
@@ -119,8 +149,13 @@ OutOptions.add_argument('-log', type=str, default="apytram.log",
 OutOptions.add_argument('-tmp',  type=str,
                     help = "Directory to stock all intermediary files for the apytram run. (default: a directory in /tmp which will be removed at the end)",
                     default = "" )
-OutOptions.add_argument('--keep_iterations',  action='store_true',
-                    help = "A fasta file containing reconstructed sequences will be created at each iteration. (default: False)")
+OutOptions.add_argument('--keep_tmp',  action='store_true',
+                        default = False,
+                        help = "By default, the temporary directory will be remove.")
+
+#OutOptions.add_argument('--keep_iterations',  action='store_true',
+#                    help = "A fasta file containing reconstructed sequences will be created at each iteration. (default: False)")
+
 OutOptions.add_argument('--no_best_file',  action='store_true',
                         default = False,
                         help = "By default, a fasta file (Outprefix.best.fasta) containing only the best sequence is created. If this option is used, it will NOT be created.")
@@ -141,17 +176,17 @@ OutOptions.add_argument('--plot_ali', action='store_true',
 
 ##############
 SearchOptions = parser.add_argument_group('Thresholds for EACH ITERATION')
-SearchOptions.add_argument('-e', '--evalue',  type=float,
+SearchOptions.add_argument('-e', '--evalue',  type=positive_float,
                     help = "Evalue threshold of the blastn of the bait queries on the database of reads. (Default 1e-3)",
                     default = 1e-3 )
 
-SearchOptions.add_argument('-id', '--min_id',  type=int,
+SearchOptions.add_argument('-id', '--min_id',  type=positive_integer,
                     help = "Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 50)",
                     default = 50 )
-SearchOptions.add_argument('-mal', '--min_ali_len',  type=int,
+SearchOptions.add_argument('-mal', '--min_ali_len',  type=positive_integer,
                     help = "Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default = 180 )
-SearchOptions.add_argument('-len', '--min_len',  type=int,
+SearchOptions.add_argument('-len', '--min_len',  type=positive_integer,
                     help = "Minimum length to keep a sequence at the end of a iteration. (Default 200)",
                     default = 200 )
 ##############
@@ -159,7 +194,7 @@ SearchOptions.add_argument('-len', '--min_len',  type=int,
 
 ##############
 StopOptions = parser.add_argument_group('Criteria to stop iteration')
-StopOptions.add_argument('-required_coverage',  type=float,
+StopOptions.add_argument('-required_coverage',  type=positive_integer,
                     help = "Required coverage of a bait sequence to stop iteration (Default: No threshold)",
                     default = 200 )
 StopOptions.add_argument('--finish_all_iter', action='store_true',
@@ -171,13 +206,13 @@ StopOptions.add_argument('--finish_all_iter', action='store_true',
 
 ##############
 FinalFilterOptions = parser.add_argument_group('Thresholds for Final output files')
-FinalFilterOptions.add_argument('-flen', '--final_min_len',  type=int,
+FinalFilterOptions.add_argument('-flen', '--final_min_len',  type=positive_integer,
                     help = "Minimum PERCENTAGE of the query length to keep a sequence at the end of the run. (Default: 0)",
                     default = 0 )
-FinalFilterOptions.add_argument('-fid', '--final_min_id',  type=int,
+FinalFilterOptions.add_argument('-fid', '--final_min_id',  type=positive_integer,
                     help = "Minimum identity PERCENTAGE of a sequence with a query on the length of their alignment so that the sequence is kept at the end of the run (Default 0)",
                     default = 0 )
-FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=int,
+FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=positive_integer,
                      help = "Alignment length between a sequence and a query must be at least this PERCENTAGE of the query length to keep this sequence at the end of the run. (Default: 0)",
                     default = 0 )
 ##############
@@ -185,13 +220,13 @@ FinalFilterOptions.add_argument('-fmal', '--final_min_ali_len',  type=int,
 
 ##############
 MiscellaneousOptions = parser.add_argument_group('Miscellaneous options')
-MiscellaneousOptions.add_argument('-threads',  type=int,
+MiscellaneousOptions.add_argument('-threads',  type=positive_integer,
                     help = "Number of available threads. (Default 1)",
                     default = 1 )
-MiscellaneousOptions.add_argument('-memory',  type=int,
+MiscellaneousOptions.add_argument('-memory',  type=positive_integer,
                     help = "Memory available for the assembly in Giga. (Default 1)",
                     default = 1 )
-MiscellaneousOptions.add_argument('-time_max',  type=int,
+MiscellaneousOptions.add_argument('-time_max',  type=positive_integer,
                     help = "Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
                     default = 7200 )
 ##############
@@ -231,17 +266,21 @@ logger.warning("[Running in process...]\n[Warning messages may print, but they a
 logger.info(" ".join(sys.argv))
 
 
+error = False
 
 ### Set up the temporary directory
 if args.tmp:
-    if os.path.isdir(args.tmp):
-        logger.info("The temporary directory %s exists" %(args.tmp) )
+    if not "apytram" in args.tmp:
+        logger.error("""ERROR: Temporary directory name (-tmp) must contain "apytram" to safety reasons because it will be completly remove.""")
+        error = True
+    elif os.path.isdir(args.tmp):
+        logger.info("The temporary directory %s exists" %(args.tmp))
     else:
         logger.info("The temporary directory %s does not exist, it will be created" % (args.tmp))
         os.makedirs(args.tmp)
     TmpDirName = args.tmp
 else:
-    TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram')
+    TmpDirName = tempfile.mkdtemp(prefix='tmp_apytram_')
 
 
 ### Read the arguments
@@ -251,7 +290,7 @@ else:
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
 
-error = False
+
 
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
@@ -268,7 +307,7 @@ FinalMinLength = args.final_min_len
 FinalMinIdentityPercentage = args.final_min_id
 FinalMinAliLength = args.final_min_ali_len
 
-KeepIterations = args.keep_iterations
+#KeepIterations = args.keep_iterations
 FinishAllIter = args.finish_all_iter
 
 Threads = args.threads
@@ -382,6 +421,7 @@ for item in DBs:
     new_species.FinalMinAliLength = FinalMinAliLength
     
     s = item.split(":")
+    
     if len(s) == 2 :
         (new_species.DatabaseName, new_species.Species) = s
         if not new_species.Species in SpeciesList:
@@ -407,7 +447,7 @@ for item in FAs:
                 SpeciesList[SpeciesNamesList.index(species)].Fasta.append(fq)
         else:
             logger.error("%s (-fa) is not a file." %(fa))
-            ApytramNeeds.end(1,TmpDirName)
+            ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
     else:
         logger.error( """ "%s" must be formatted as "fa_path:species" if you want to use the multispecies option" """ %(item))
 
@@ -424,11 +464,10 @@ for item in FQs:
                 SpeciesList[SpeciesNamesList.index(species)].Fastq.append(fq)
             else:
                 logger.error("The species associted with %s is %s. But there is no database associated with the species %s." %(fq,species,species))
-                ApytramNeeds.end(1,TmpDirName)
-                
+                ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
         else:
             logger.error("%s (-fq) is not a file." %(fq))
-            ApytramNeeds.end(1,TmpDirName)
+            ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
     else:
         logger.error( """ "%s" must be formatted as "fq_path:species" if you want to use the multispecies option" """ %(item))
 
@@ -451,18 +490,16 @@ for Species in SpeciesList:
         Species.set_TmpDir(TmpDirName)
         Species.set_OutputDir(args.output_prefix)
 
-if error:
-    ApytramNeeds.end(1,TmpDirName)
-
-
 logger.debug("Time to parse input command line: %s" %(time.time() - start_time))
 
+if error:
+    logger.error("Error(s) occured, see above")
+    ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
 
-
-# ### If iteration begin not from 1, the temporary directory must be given by the user
-# if StartIteration != 1 and not args.tmp:
-#     logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
-#     sys.exit(1)
+### If iteration begin not from 1, the temporary directory must be given by the user
+if StartIteration != 1 and not args.tmp:
+    logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
+    ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
 
 
 
@@ -479,7 +516,7 @@ for Species in SpeciesList :
 ### If there is a query continue, else stop
 if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
-    ApytramNeeds.end(0,TmpDirName)
+    ApytramNeeds.end(0,TmpDirName,keep_tmp = args.keep_tmp)
 
 ### Set up the output directory
 if args.output_prefix:
@@ -492,7 +529,7 @@ if args.output_prefix:
         os.makedirs(os.path.dirname(args.output_prefix))
 else:
     logger.error("The output prefix must be defined")
-    ApytramNeeds.end(1,TmpDirName)
+    ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
 
 
 for Query in QueriesList:
@@ -659,9 +696,9 @@ for Query in QueriesList:
             logger.info("End of the iteration %s for %s : --- %s seconds ---" % (Species.CurrentIteration, Species.Species, Species.get_iter_statistic("IterationTime")))
 
         
-            #if (time.time() - start_time) > MaxTime and Stop == False:
-            #    logger.warn("No new iteration will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - start_time)))
-            #    Stop = True
+            if (time.time() - Query.StartTime) > MaxTime :
+                logger.warn("No new iteration for this query and this species will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - Query.StartTime)))
+                Query.Stop = True
 
 
 
@@ -672,31 +709,34 @@ for Query in QueriesList:
     for Species in SpeciesList:
 
         if Species.FinalIteration: #We check that there is at least one iteration with a result
-            if Species.FinalMinLength or Species.FinalMinIdentityPercentage or Species.FinalMinAliLength:
+ 
+           if Species.FinalMinLength or Species.FinalMinIdentityPercentage or Species.FinalMinAliLength:
                 start_iter_i = time.time()
                 Species.new_iteration(start_iter_i)
                 # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
                 # and write filtered sequences in a file
                 Species.parse_and_filter_exonerate_results(final_iteration = True)
-
-            start_output = time.time()
-            if Species.FilteredSequenceNames: # If sequences pass the last filter
                 Species.add_iter_statistic("NbContigs", len(Species.FilteredSequenceNames))
-                #### Write fasta output files
-                Species.write_fasta_apytram_outputs(Query, no_best_file = args.no_best_file, only_best_file = args.only_best_file)
 
-                if args.plot_ali or args.stats:
-                    ### Calculate the coverage
-                    logger.info("Calculate the final coverage")
-                    Species.measure_coverage(Query)
+           start_output = time.time()
+           if Species.FilteredSequenceNames: # If sequences pass the last filter                
+               # Prepare fasta output files by species
+               if not args.only_best_file:
+                   Query.BestOutFileContent.extend(Species.get_output_fasta(Query, fasta = "best"))
+               if not args.no_best_file:
+                   Query.OutFileContent.extend(Species.get_output_fasta(Query, fasta = "all"))
 
+               if args.plot_ali or args.stats:
+                   ### Calculate the coverage
+                   logger.info("Calculate the final coverage")
+                   Species.measure_coverage(Query)
 
-
-            Species.end_iteration()
+           Species.end_iteration()
+    
 
             # Stats files
 
-            if args.plot_ali:
+           if args.plot_ali:
                 start_output_ali = time.time()
                 LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
                 if LengthAlignment <= 3100:
@@ -711,10 +751,12 @@ for Query in QueriesList:
         else:
             logger.warn("No results")
 
+
+
         if args.stats:
             start_output_stat = time.time()
             logger.info("Write statistics file (OutPrefix.stats.csv)")
-            Species.write_stats_csv(Query)
+            Query.StatsFileContent.extend(Species.get_stats())
 
             if args.plot:
                 logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
@@ -724,9 +766,18 @@ for Query in QueriesList:
                 logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
 
 
-        logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
-        logger.info("--- %s seconds ---" % (time.time() - start_time))
+    logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
 
+    ### Write fasta outputfiles
+    if Query.BestOutFileContent:
+        ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
+    if Query.OutFileContent:
+        ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.OutPrefixName + ".fasta")
+    if Query.StatsFileContent:
+        ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
 
+    
+
+logger.info("--- %s seconds ---" % (time.time() - start_time))
 logger.warning("END")
-ApytramNeeds.end(0,TmpDirName)
+ApytramNeeds.end(0,TmpDirName,keep_tmp = args.keep_tmp)
