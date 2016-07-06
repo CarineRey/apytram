@@ -57,6 +57,36 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+
+
+#### Sequence class     
+        
+class Sequence
+	def __init__(self,ListLine):
+		#TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+		
+		#t = target
+		#q = query
+		#i = id
+		#l = length
+		#a = aligned part
+		#b = begin
+		#e = end
+		self.TrinityName = ListLine[0]
+		self.ti = ListLine[1]
+		self.ql =    float(ListLine[2])
+		self.tal =   float(ListLine[3])
+		self.tl =    float(ListLine[4])
+		self.tae =   float(ListLine[5])
+		self.score = float(ListLine[6])
+		self.pi =    float(ListLine[7])
+		self.qab =   float(ListLine[8])
+		self.qae =   float(ListLine[9])
+		
+		self.BestSequence = ""
+
+
+#### Execution statistics class
 class Exec_stats:
     def __init__(self,start_time):
         New_Time_stat_dic = {"DatabaseBuilding": 0,
@@ -158,9 +188,13 @@ class RNA_species:
         else:
             return (0)
     
-    def add_iter_statistic(self, attribute, value):
+    def add_iter_statistic(self, attribute, value, mode_add = False):
         if attribute in self.ExecutionStats.IterAtributes:
-            self.ExecutionStats.IterStatsDict[self.CurrentIteration][attribute] = value
+			if mode_add:
+				self.ExecutionStats.IterStatsDict[self.CurrentIteration].setdefault(attribute,0)
+				self.ExecutionStats.IterStatsDict[self.CurrentIteration][attribute] += value
+			else:
+				self.ExecutionStats.IterStatsDict[self.CurrentIteration][attribute] = value
     
     def get_iter_statistic(self,attribute, IterNb = None, RelIter = 0):
         if not IterNb:
@@ -433,7 +467,8 @@ class RNA_species:
         
         self.add_time_statistic("Exonerate_1", start = start)
         self.logger.debug("Exonerate_1 --- %s seconds ---" %(self.get_time_statistic("Exonerate_1")))
-        
+	
+
     def parse_and_filter_exonerate_results(self, final_iteration = False):
         self.FilteredTrinityFasta = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
         if not final_iteration:
@@ -620,12 +655,89 @@ class RNA_species:
         df.insert(0, "Iteration", df.index)
         df.insert(0, "Species", self.Species)
         return([df])
-        
+
+    def parse_exonerate_results(self, final_iteration = False):
+		"Return a list of Sequences if the identity percentage is superior to MinIdentityPercentage and the alignment length is superior to MinAliLen "
+		
+		if final_iteration:
+			minidentypercentage =  self.FinalMinIdentityPercentage
+			minalilength = 0
+			minlengthpercentage = self.FinalMinLength
+			minalilengthpercentag = self.FinalMinAliLength
+		else:
+			minidentypercentage = self.MinIdentityPercentage
+			minalilength = self.MinAliLength
+			minlengthpercentage = 0
+			minalilengthpercentag = 0
+
+		self.SequencesList = []
+		BestScoreNames = {}
+		
+		List = self.ExonerateResult.strip().split("\n")
+		
+		for line in List:
+			ListLine = line.split("\t")		
+			(ti,qi) = ListLine[1]
+			(ql,tal,tl,tab,tae,score,pi,qab,qae) = [float(x) for x in ListLine[2:]]
+			
+			if (pi >=  minidentypercentage) and (tal >= minalilength) and (ql >= minlengthpercentage*tl/100) and (tal >= minalilengthpercentage*tl/100) :
+				# We keep this sequence
+				# A same sequence can be present 2 time if the hit scores are identical.
+				# We keep only the first
+				ever_seen = False
+				for Sequence in self.SequencesList:
+					if Sequence.TrinityName == qi:
+						ever_seen = True
+						break
+				if not ever_seen:
+					new_sequence = Sequence(ListLine)					
+					SequencesList.append(new_sequence)
+
+					self.add_iter_statistic("TotalIdentity", pi, mode_add = True)
+					if self.get_iter_statistic("BestIdentity") <= pi:
+						self.add_iter_statistic("BestIdentity",pi)
+						
+					self.add_iter_statistic("TotalLength", ql, mode_add = True)
+					if self.get_iter_statistic("BestLength") <= ql:
+						self.add_iter_statistic("BestLength", ql)
+						
+					self.add_iter_statistic("TotalScore", score, mode_add = True)
+					if self.get_iter_statistic("BestScore") <= score :
+						self.add_iter_statistic("BestScore", score)
+	
+					IterStats["TotalLength"] += ql
+					if IterStats["BestLength"] <= ql:
+						IterStats["BestLength"] = ql
+	
+					IterStats["TotalScore"] += score
+					if IterStats["BestScore"] <= score:
+						IterStats["BestScore"] = score
+						BestScoreNames[ti] = qi
+						
+					# Check if the seqeunce is reverse
+					if ((qae-qab)*(tae-tab) < 0):
+						new_sequence.reverse = True
+		
+		NbContigs = len(self.SequencesList)
+		self.add_iter_statistic("NbContigs",NbContigs)
+		
+		if NbContigs:
+			AverageIdentity = self.get_iter_statistic("TotalIdentity") / NbContigs 
+			AverageLength = self.get_iter_statistic("TotalLength") / NbContigs
+			AverageScore = self.get_iter_statistic("TotalScore") / NbContigs
+			
+			self.add_iter_statistic("AverageIdentity", pi)
+			self.add_iter_statistic("AverageLength", pi)
+			self.add_iter_statistic("AverageScore", pi)
 
 		
-    
- #   def new_query(self):
-        
+		for (Target,Query) in BestScoreNames.items():
+			for Sequence in SequencesList:
+				if Query == Sequence.TrinityName:
+					Sequence.BestSequence = Target
+#   def new_query(self):
+ 
+      
 
 
 #### query class
@@ -674,9 +786,6 @@ class Query:
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
-        
-        
-        
         
         
 
