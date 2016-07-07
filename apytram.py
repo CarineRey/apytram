@@ -344,7 +344,7 @@ for query in Queries:
         logger.error("\t-%s ... ERROR (empty)" %(query))
         error = True
     else:
-        new_query = ApytramClasses.Query(Query_name,query)
+        new_query = ApytramClasses.Query(Query_name,query,logger)
         new_query.TmpDirName = TmpDirName
         logger.warning("\t-%s ... ok (%s sequences)" %(new_query.RawQuery,new_query.SequenceNb))
         if not Query_name in QueriesList:
@@ -727,18 +727,6 @@ for Query in QueriesList:
 
             # Stats files
 
-           if args.plot_ali:
-                start_output_ali = time.time()
-                LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
-                if LengthAlignment <= 3100:
-                    logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
-                    ApytramNeeds.create_plot_ali(Species.DicPlotCov, Query.OutPrefixName + "_" + Species.Species)
-                else:
-                    logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")
-                logger.info("Write the final alignment in OutPrefix.ali.fasta")
-                ApytramNeeds.write_in_file(Species.MafftResult,"%s.ali.fasta" %(Query.OutPrefixName + "_" + Species.Species))
-                logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
-
         else:
             logger.warn("No results")
 
@@ -761,12 +749,26 @@ for Query in QueriesList:
 
     ### Write fasta outputfiles
     if Query.BestOutFileContent:
-        ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
+        ApytramNeeds.write_in_file("\n".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
     if Query.OutFileContent:
-        ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.OutPrefixName + ".fasta")
+        Query.FinalFastaFileName = Query.OutPrefixName + ".fasta"
+        ApytramNeeds.write_in_file("\n".join(Query.OutFileContent), Query.FinalFastaFileName)
     if Query.StatsFileContent:
         ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
 
+    if args.plot_ali and Query.FinalFastaFileName:
+        start_output_ali = time.time()
+        Query.measure_coverage()
+        LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
+        if LengthAlignment <= 3100:
+            logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
+            ApytramNeeds.create_plot_ali(Query.DicPlotCov, Query.OutPrefixName)
+        else:
+            logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")
+        logger.info("Write the final alignment in OutPrefix.ali.fasta")
+        ApytramNeeds.write_in_file(Query.MafftResult,"%s.ali.fasta" %(Query.OutPrefixName))
+        logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
+    
     
 
 logger.info("--- %s seconds ---" % (time.time() - start_time))

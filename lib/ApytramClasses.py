@@ -539,25 +539,25 @@ class RNA_species:
         if self.FilteredTrinityFasta.Sequences: # If sequences pass the filter
             # Read fasta       
             TrinityFasta = ApytramNeeds.Fasta()
-            TrinityFasta.read_fasta(self.TrinityFastaFilename)
+            TrinityFasta.read_fasta(FastaFilename = self.TrinityFastaFilename)
             
             # get sequence for filtered sequences in the trinityfasta
             self.FilteredTrinityFasta.complete_fasta(TrinityFasta)
             
             if final_iteration:
-				# build dictionnary to rename sequences
-				Message = self.Species + "_"
-				NewnameDict = {}
-				i = 0
-				for Sequence in self.FilteredTrinityFasta.Sequences:
-					i +=1
-					OldName = Sequence.Name
-					if Sequence.BestSequence:
-						Message += "Best_"
-					NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
-					NewnameDict[OldName] = NewName
-				
-				self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
+                # build dictionnary to rename sequences
+                Message = self.Species + "_"
+                NewnameDict = {}
+                i = 0
+                for Sequence in self.FilteredTrinityFasta.Sequences:
+                    i +=1
+                    OldName = Sequence.Name
+                    if Sequence.BestSequence:
+                        Message += "Best_"
+                    NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
+                    NewnameDict[OldName] = NewName
+                
+                self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
   
@@ -596,7 +596,7 @@ class RNA_species:
         
         self.logger.debug("Mafft --- %s seconds ---" %(self.get_time_statistic("Mafft"))) 
         
-        (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult)
+        (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult,Query.ReferenceNames)
 
         self.add_iter_statistic("StrictCoverage", StrictCoverage)
         self.add_iter_statistic("LargeCoverage", LargeCoverage)
@@ -702,10 +702,18 @@ class RNA_species:
 #### query class
 
 class Query:
-    def __init__(self,Name,QueryPath):
+    def __init__(self,Name,QueryPath,logger):
+        self.logger = logger
         self.Name = Name
         self.RawQuery = QueryPath
         self.SequenceNb = ApytramNeeds.count_sequences(QueryPath)
+        
+        #Read fasta
+        QueryFasta = ApytramNeeds.Fasta()
+        QueryFasta.read_fasta(FastaFilename = QueryPath)
+        
+        #Get Sequences names
+        self.ReferenceNames = QueryFasta.Names
         
 
         self.AlignedQuery = ""
@@ -745,7 +753,21 @@ class Query:
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
+    def measure_coverage(self):
+        # Use Mafft
+        start = time.time()
+        MafftProcess = Aligner.Mafft(self.AlignedQuery)
+        MafftProcess.QuietOption = True
+        MafftProcess.AutoOption = True
+        #MafftProcess.AdjustdirectionOption = True
+        MafftProcess.AddOption = self.FinalFastaFileName
+        (self.MafftResult,err) = MafftProcess.get_output()
         
+        self.logger.debug("Mafft --- %s seconds ---" %(time.time() - start)) 
+        
+        (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult,self.ReferenceNames)
+
+        self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
         
 
 

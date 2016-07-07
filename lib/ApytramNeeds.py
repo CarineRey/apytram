@@ -120,7 +120,7 @@ class Sequence:
 
 # import os,re
 # f = Fasta()
-# f.read_fasta("example/multi_ref.fasta")
+# f.read_fasta(FastaFilename = "example/multi_ref.fasta")
 # fi = f.filter_fasta("ENSMUSP00000002708_G01455")
 # print fi
 # d = {"ENSMUSP00000002708_G01455" : "totot"}
@@ -132,6 +132,7 @@ class Fasta:
     def __init__(self):
         self.Sequences = []
         self.Names = []
+        self.ReferenceSequences = []
     
     def __str__(self):
         string = []
@@ -148,11 +149,15 @@ class Fasta:
         self.Sequences.append(new_sequence)
         self.Names.append(new_sequence.Name)
         
-    def read_fasta(self,FastaFile):
-        if os.path.isfile(FastaFile):
-            File = open(FastaFile,"r")
+    def read_fasta(self, FastaFilename = "" , String = ""):
+        if String:
+            Fasta = String.strip().split("\n")
+        elif os.path.isfile(FastaFilename):
+            File = open(FastaFilename,"r")
             Fasta = File.read().strip().split("\n")
             File.close()
+        else:
+			Fasta = []
         
         name = ""
         sequence = ""
@@ -445,21 +450,113 @@ def create_plot(TimeStatsDict, IterStatsDict, OutPrefixName):
         pdf.savefig()
         plt.close()
 
+
+def calculate_coverage(AlignmentString, RefSeq):
+    assert AlignmentString, "AlignmentString must not be empty"
+    assert isinstance(AlignmentString,str),  "AlignmentString must be str"
+    assert isinstance(RefSeq,list),  "RefSeq must be list"
+    # The first sequence must be the reference
+    #Alignment reading
+    Alignment = Fasta()
+    Alignment.read_fasta(String = AlignmentString)
+    
+    #Build a reference consensus sequences
+    
+    Ref_Ali = Alignment.filter_fasta(RefSeq)
+    ConsensusList = []
+    AliLength = len(Ref_Ali.Sequences[0].Sequence)
+    for i in range(AliLength):
+        # get all nucl for reference for each position
+        pos = {seq.Sequence[i] for seq in Ref_Ali.Sequences}
+        if "-" in pos:
+            pos.remove("-")
+        pos = list(pos)
+        if len(pos) == 1:
+            ConsensusList.append(pos[0])
+        elif len(pos) == 0:
+            ConsensusList.append("-")
+        else:
+            ConsensusList.append("0")
+    
+    # Attribute a code for each position
+    ## 0 Gap
+    ## 1 All references identical
+    ## 2 ambigous in reference
+    ## 3 contig identical references
+    ## 4 contig ok but ambigous reference
+    ## 5 present in contig but not in reference
+    ## 6 different in contig than in reference
+    
+    DicPlotCov = {}
+    StrictRefCov = [0]*AliLength
+    LargeRefCov = [0]*AliLength
+    
+    for Sequence in Alignment.Sequences:
+        Ref = False
+        Name = Sequence.Name
+        seq = Sequence.Sequence
+        DicPlotCov[Name] = {}
+
+        if Name in RefSeq:
+            Ref = True
+            
+        for i in range(AliLength):
+
+            if Ref:
+                if ConsensusList[i] == "0":
+                    DicPlotCov[Name][i] = 2
+                elif seq[i] == "-":
+                    DicPlotCov[Name][i] = 0             
+                else:
+                    DicPlotCov[Name][i] = 1
+            else:
+                if seq[i] == "-":
+                    DicPlotCov[Name][i] = 0
+                elif ConsensusList[i] == "-":
+                    DicPlotCov[Name][i] = 5
+                    LargeRefCov[i] = 1
+                elif ConsensusList[i] == seq[i]:
+                    DicPlotCov[Name][i] = 3
+                    StrictRefCov[i] = 1
+                    LargeRefCov[i] = 1
+                elif ConsensusList[i] == "0":
+                    DicPlotCov[Name][i] = 4
+                    StrictRefCov[i] = 1
+                    LargeRefCov[i] = 1
+                else:
+                    DicPlotCov[Name][i] = 6
+                    StrictRefCov[i] = 1
+                    LargeRefCov[i] = 1
+    
+    # Get length of the consensus
+    ConsensusLength = len([ p for p in ConsensusList if p != "-" ])
+
+    # We count the number of base position in the alignment
+    SumStrictRefCov = sum(StrictRefCov)
+    SumLargeRefCov = sum(LargeRefCov)
+
+    #Percentage of positon of the reference which is reprensented in contigs
+    StrictCov=float(SumStrictRefCov)/float(ConsensusLength) *100
+    #Percentage of positon in contigs on the number positon of the reference
+    #It can be superior to 100 if the contigs are longer than the reference
+    LargeCov=float(SumLargeRefCov)/float(ConsensusLength) *100
+    return (StrictCov, LargeCov, DicPlotCov)
+
 def create_plot_ali(DictPlotCov, OutPrefixName):
     ### Plot Ali ###
     "Create a png file containing a representation of an alignement. The first seqeunce must be the reference."
     df = pandas.DataFrame(DictPlotCov).T
     fig, ax = plt.subplots()
     ax.grid(False)
-    cmap, norm = matplotlib.colors.from_levels_and_colors([0,0.5, 1.5, 2.5,3.5,4.5],
-                                                          ["White","Orange",'Darkgreen','Darkred',"Blue"])
+    cmap, norm = matplotlib.colors.from_levels_and_colors([0,0.5, 1.5, 2.5,3.5,4.5,5.5,6.5],
+                                                          ["White","Blue","DarkViolet",'Darkgreen',"DarkViolet","Orange",'Darkred'])
     heatmap = ax.pcolor(df ,
                         edgecolors="white",  # put black lines between squares in heatmap
                         cmap=cmap,
                         norm=norm)
     # Format
     fig = plt.gcf()
-    Width = 3+float(df.shape[1])/12
+    Width = 3 + float(df.shape[1])/12
     Heigth =  1+float(df.shape[0])/2
 
     # Maximum figure size (pixels)
@@ -480,86 +577,3 @@ def create_plot_ali(DictPlotCov, OutPrefixName):
     fig.tight_layout()
     fig.savefig("%s.ali.png" % OutPrefixName)
     plt.close()
-
-def calculate_coverage(Alignment, NbRefSeq = 1):
-    # The first sequence must be the reference
-    #Alignment reading
-    Alignment= Alignment.split("\n")
-    Dic = {}
-    DicPlotCov = {}
-    RefSequence = ""
-    RefName = ""
-    Sequence = ""
-    Name = ""
-    # Reference sequence reading
-    while (len(Dic.keys()) != NbRefSeq):
-        line = Alignment.pop(0).replace("\n","")
-        if line == "":
-            pass
-        elif re.match("^>",line):
-            if RefName != "":
-                Dic[RefName] = RefSequence
-            else:
-                RefName = line.replace(">","")
-        else:
-            RefSequence+=line
-
-    # We reput the last line which is the next sequence name in the list
-    Alignment.insert(0,line)
-    # Other contig reading
-    for line in Alignment:
-        line=line.replace("\n","")
-        if line=="":
-            pass
-        elif re.match("^>",line):
-            if Sequence != "":
-                Dic[Name] = Sequence
-                Sequence = ""
-            Name=line.replace(">","")
-        else:
-            Sequence+=line
-
-    if Sequence != "":
-        Dic[Name]=Sequence
-
-    # Coverage count
-    RefLength = len(Dic[RefName])
-    # Counters initilisation
-    StrictRefCov = [0]*RefLength
-    LargeRefCov = [0]*RefLength
-    Ref = [0]*RefLength
-
-    for Contig in Dic.keys():
-        DicPlotCov[Contig] = {}
-        if Contig == RefName:
-            for i in range(0,RefLength):
-                if RefSequence[i] != "-":
-                    Ref[i]=1
-                    DicPlotCov[Contig][i] = 4
-        else:
-            Sequence = Dic[Contig]
-            for i in range(0,RefLength):
-                if Sequence[i]!='-':
-                    LargeRefCov[i] = 1
-                    if RefSequence[i] != "-":
-                        StrictRefCov[i] = 1
-                        if RefSequence[i] == Sequence[i]:
-                            DicPlotCov[Contig][i] = 2
-                        else:
-                            DicPlotCov[Contig][i] = 3
-                    else:
-                        DicPlotCov[Contig][i] = 1
-                else:
-                    DicPlotCov[Contig][i] = 0
-
-    # We count the number of base position in the alignment
-    SumStrictRefCov = sum(StrictRefCov)
-    SumLargeRefCov = sum(LargeRefCov)
-    SumRef = sum(Ref)
-
-    #Percentage of positon of the reference which is reprensented in contigs
-    StrictCov=float(SumStrictRefCov)/float(SumRef) *100
-    #Percentage of positon in contigs on the number positon of the reference
-    #It can be superior to 100 if the contigs are longer than the reference
-    LargeCov=float(SumLargeRefCov)/float(SumRef) *100
-    return (StrictCov, LargeCov, DicPlotCov)
