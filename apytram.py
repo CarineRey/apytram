@@ -553,28 +553,24 @@ for Query in QueriesList:
 
             ### Blast bait sequences on database of reads
             # Write read names in ReadNamesFile if the file does not exist
-            if not os.path.isfile(Species.ReadNamesFile):
+            if not os.path.isfile(Species.ReadNamesFilename):
                 Species.launch_Blastn(Query.BaitSequences,Threads)
             else:
-                logger.warn("%s has already been created, it will be used"
-                %Species.ReadNamesFile )
+                logger.warn("%s has already been created, it will be used" %Species.ReadNamesFilename )
 
-            #StatsDict[i]["BlastTime"] = time.time() - start_blast_time
-            #logger.debug("blast --- %s seconds ---" % (StatsDict[i]["BlastTime"]))
             if Species.PairedData:
                 # Get paired reads names and remove duplicated names
                 logger.info("Get paired reads names and remove duplicated names")
-                ApytramNeeds.add_paired_read_names(Species.ReadNamesFile,logger)
+                ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename,logger)
             else:
                 # Remove duplicated names
                 logger.info("Remove duplicated names")
-                ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFile,logger)
+                ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename,logger)
 
             # Count the number of reads which will be used in the Trinity assembly
             logger.info("Count the number of reads")
-            Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFile)
+            Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFilename)
             Species.add_iter_statistic("ReadsNumber",Species.ReadsNumber)
-            #StatsDict[i]["ReadsNumber"] = Species.ReadsNumber
 
             if not Species.ReadsNumber:
                 logger.warning("No read recruted by Blast at the iteration %s" %(Species.CurrentIteration))
@@ -583,7 +579,7 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
-                Identical = ApytramNeeds.are_identical(Species.ReadNamesFile,Species.PreviousReadNamesFile)
+                Identical = ApytramNeeds.are_identical(Species.ReadNamesFilename, Species.PreviousReadNamesFilename)
                 if Identical and not FinishAllIter:
                     logger.info("Reads from the current iteration are identical to reads from the previous iteration")
                     Species.Improvment = False
@@ -596,14 +592,14 @@ for Query in QueriesList:
                 ### Launch Trinity
                 Species.launch_Trinity(Threads, Memory)
 
-                if not os.path.isfile(Species.TrinityFasta): # Trinity found nothing
+                if not os.path.isfile(Species.TrinityFastaFilename): # Trinity found nothing
                     Species.Improvment = False
                     Species.CompletedIteration = False
 
                 if Species.Improvment:
                     ### Filter Trinity contigs to keep only homologous sequences of the reference genes
                     logger.info("Compare Trinity results with query sequences")
-                    Species.compare_trinity_results_with_references(Query)
+                    Species.get_homology_between_trinity_results_and_references(Query)
                     
                     if not Species.TrinityExonerateResult:
                         logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
@@ -613,11 +609,11 @@ for Query in QueriesList:
                     if Species.Improvment:
                         # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
                         # and write filtered sequences in a file
-                        Species.parse_and_filter_exonerate_results()
+                        Species.filter_trinity_results_according_homology_results()
                         
                         ### Validated sequences (Species.FilteredTrinityFasta)  become bait sequences
 
-                        if not Species.FilteredSequenceNames:
+                        if not Species.FilteredTrinityFasta.Sequences:
                             logger.warning("No sequence has passed the iteration filter at the iteration %s for %s" %(Species.CurrentIteration, Species.Species))
                             Species.Improvment = False
                             Species.CompletedIteration = False
@@ -629,8 +625,6 @@ for Query in QueriesList:
                             #Check if the number of contigs has changed
                             logger.info("Check if the number of contigs has changed")
                             
-                            Species.add_iter_statistic("NbContigs", len(Species.FilteredSequenceNames))
-
                             if Species.get_iter_statistic("NbContigs") != Species.get_iter_statistic("NbContigs", RelIter = -1):
                                 logger.info("The number of contigs has changed")
                             elif Query.AbsIteration >= 2:
@@ -701,30 +695,27 @@ for Query in QueriesList:
                 Query.Stop = True
 
 
-
     logger.info("End of Iterations for %s. Iterative process takes %s seconds." %(Query.Name, time.time() - Query.StartTime))
 
     ### Final filter
     start_output = time.time()
     for Species in SpeciesList:
-
         if Species.FinalIteration: #We check that there is at least one iteration with a result
- 
-           if Species.FinalMinLength or Species.FinalMinIdentityPercentage or Species.FinalMinAliLength:
+           if Species.FinalMinLength or Species.FinalMinIdentityPercentage or Species.FinalMinAliLength: # A final filter is required
                 start_iter_i = time.time()
-                Species.new_iteration(start_iter_i)
+                Species.new_iteration()
+                logger.info("Start final filter for %s" %(Species.Species))
                 # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
                 # and write filtered sequences in a file
-                Species.parse_and_filter_exonerate_results(final_iteration = True)
-                Species.add_iter_statistic("NbContigs", len(Species.FilteredSequenceNames))
+                Species.filter_trinity_results_according_homology_results(final_iteration = True)
 
            start_output = time.time()
-           if Species.FilteredSequenceNames: # If sequences pass the last filter                
+           if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter                
                # Prepare fasta output files by species
                if not args.only_best_file:
-                   Query.BestOutFileContent.extend(Species.get_output_fasta(Query, fasta = "best"))
+                   Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
                if not args.no_best_file:
-                   Query.OutFileContent.extend(Species.get_output_fasta(Query, fasta = "all"))
+                   Query.OutFileContent.extend(Species.get_output_fasta(fasta = "all"))
 
                if args.plot_ali or args.stats:
                    ### Calculate the coverage

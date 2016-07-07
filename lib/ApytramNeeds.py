@@ -49,9 +49,166 @@ from matplotlib.backends.backend_pdf import PdfPages
 #matplotlib.style.use('ggplot')
 
 
-# Function to end apytram in removing temporary directory
+
+# Class
+
+#### Sequence class     
+        
+class Sequence:
+    def __init__(self,):
+        self.Name = ""
+        self.OldName = ""
+        
+        self.Sequence = ""
+        
+        ### homology score with the best reference
+        #t = target
+        #q = query
+        #i = id
+        #l = length
+        #a = aligned part
+        #b = begin
+        #e = end
+        self.ti =    ""
+        self.ql =    ""
+        self.tal =   ""
+        self.tl =    ""
+        self.tae =   ""
+        self.score = ""
+        self.pi =    ""
+        self.qab =   ""
+        self.qae =   ""
+        
+        ### Caracteristics
+        self.BestSequence = ""
+        self.Reverse = False
+    
+    def __str__(self):
+        return(">" + self.Name + "\n" + '\n'.join(self.Sequence[i:i+60] for i in range(0, len(self.Sequence), 60)))
+           
+    def copy(self):
+        ns = Sequence()
+        
+        for (att,value) in self.__dict__.items():
+            ns.__dict__[att] = value
+        
+        return(ns)
+    
+    def add_attribute_from_exonerate(self, ExonerateListLine):
+        #TrinityExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+        #"%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
+        self.ti     = ExonerateListLine[0]
+        self.Name   = ExonerateListLine[1]
+        self.ql     = float(ExonerateListLine[2])
+        self.tal    = float(ExonerateListLine[3])
+        self.tl     = float(ExonerateListLine[4])
+        self.tab    = float(ExonerateListLine[5])
+        self.tae    = float(ExonerateListLine[6])
+        self.score  = float(ExonerateListLine[7])
+        self.pi     = float(ExonerateListLine[8])
+        self.qab    = float(ExonerateListLine[9])
+        self.qae    = float(ExonerateListLine[10])
+    
+    def complete(self,newinfo_sequence):
+        for (att,value) in self.__dict__.items():
+            if not value and newinfo_sequence.__dict__[att]:
+                self.__dict__[att] = newinfo_sequence.__dict__[att]
+        
+
+
+#### Fasta class
+
+# import os,re
+# f = Fasta()
+# f.read_fasta("example/multi_ref.fasta")
+# fi = f.filter_fasta("ENSMUSP00000002708_G01455")
+# print fi
+# d = {"ENSMUSP00000002708_G01455" : "totot"}
+# fd = fi.rename_fasta(d)
+# print fd
+# fd.write_fasta("test")
+
+class Fasta:
+    def __init__(self):
+        self.Sequences = []
+        self.Names = []
+    
+    def __str__(self):
+        string = []
+        for s in self.Sequences:
+            string.extend([str(s)])   
+        return("".join(string))
+        
+    def append(self,new_sequence):
+        assert isinstance(new_sequence, Sequence), "Sequence must belong to the Sequence class"
+        if new_sequence.Reverse and new_sequence.Sequence:
+            new_sequence.Sequence = reverse_complement(new_sequence.Sequence)
+            new_sequence.Reverse = False
+        
+        self.Sequences.append(new_sequence)
+        self.Names.append(new_sequence.Name)
+        
+    def read_fasta(self,FastaFile):
+        if os.path.isfile(FastaFile):
+            File = open(FastaFile,"r")
+            Fasta = File.read().strip().split("\n")
+            File.close()
+        
+        name = ""
+        sequence = ""
+        sequence_list = []
+        
+        for line in Fasta + [">"]:
+            if re.match(">",line):
+                # This is a new sequence write the previous sequence if it exists
+                if sequence_list:
+                    new_sequence = Sequence()
+                    new_sequence.Name = name
+                    new_sequence.Sequence = "".join(sequence_list)
+                    self.append(new_sequence)
+                    sequence_list = []
+                    
+                name = line.split()[0][1:] # remove the >
+            
+            elif name != "":
+                sequence_list.append(line)
+            else:
+                pass
+    
+    def filter_fasta(self, SelectedNames):
+        FilteredFasta = Fasta()
+        for s in self.Sequences:
+            if s.Name in SelectedNames:
+                FilteredFasta.append(s)
+        return FilteredFasta
+    
+    def complete_fasta(self,NewInfoFasta):
+        assert isinstance(NewInfoFasta, Fasta), "NewInfoFasta must belong to the Fasta class"
+        for i in range(len(self.Sequences)):
+            if self.Sequences[i].Name in NewInfoFasta.Names:
+                index = NewInfoFasta.Names.index(self.Sequences[i].Name)
+                self.Sequences[i].complete(NewInfoFasta.Sequences[index])
+                
+        
+    def rename_fasta(self, OldNamesNewNamesDict):
+        assert isinstance(OldNamesNewNamesDict, dict), "OldNamesNewNamesDict must be a dict"
+        RenamedFasta = Fasta()
+        for s in self.Sequences:
+            if s.Name in OldNamesNewNamesDict.keys():
+                ns = s.copy()
+                ns.Name = OldNamesNewNamesDict[s.Name]
+                ns.OldName = s.Name
+                RenamedFasta.append(ns)
+        return RenamedFasta
+    
+    
+    def write_fasta(self, OutFastaFile):
+        # Write all sequences in the file
+        write_in_file(str(self), OutFastaFile)
+
 
 def end(exit_code, TmpDirName, keep_tmp = False, logger=""):
+    "Functions to end apytram in removing temporary directory"
     ### Remove tempdir if the option --tmp have not been use
     if logger:
         logger.debug("Remove the temporary directory")
@@ -59,8 +216,7 @@ def end(exit_code, TmpDirName, keep_tmp = False, logger=""):
     if not keep_tmp and "apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
     sys.exit(exit_code)
-    
-    
+      
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
     command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
@@ -81,12 +237,12 @@ def cat_fasta(FastaFiles,CatFastaFile):
     (out, err) = p.communicate()
     return (out, err)
     
-def reverse_complement(Sequence):
+def reverse_complement(Sequence_str):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
     outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
     trantab = string.maketrans(intab, outtab)
     # Reverse
-    Reverse = Sequence.replace("\n","")[::-1]
+    Reverse = Sequence_str.replace("\n","")[::-1]
     # Complement 
     Complement = Reverse.translate(trantab)   
     Complement = '\n'.join(Complement[i:i+60] for i in range(0, len(Complement), 60))
@@ -257,47 +413,6 @@ def check_almost_identical_exonerate_results(ExonerateResult):
     if len(List) == i:
         Result = True
     return Result 
-        
-def filter_fasta(FastaFile, Names, OutFastaFile, ReverseNames = []):
-    "Return a fasta file with only sequence in Names"
-    File = open(FastaFile,"r")
-    Fasta = File.read().strip().split("\n")
-    File.close()
-    name = ""
-    sequence = ""
-    sequence_list = []
-    string_list = []
-    for line in Fasta:
-        if re.match(">",line):
-            # This is a new sequence write the previous sequence if it exists
-            if sequence_list:
-                sequence = "".join(sequence_list)
-                if name in ReverseNames:
-                    sequence = reverse_complement(sequence)
-                string_list.append(sequence)
-                sequence_list = []
-            name = line.split()[0].replace(">","")
-            if name in Names:
-                string_list.append( ">%s\n" % name)
-            else:
-                name = ""
-        elif name != "":
-            sequence_list.append(line + "\n")
-        else:
-            pass
-    # Write the last sequence    
-    if sequence_list:
-        sequence = "".join(sequence_list)
-        if name in ReverseNames:
-            sequence = reverse_complement(sequence)
-        string_list.append(sequence)
-        sequence_list = []
-                
-    # Write all sequences in the file
-    OutFile = open(OutFastaFile,"w")
-    OutFile.write("".join(string_list))
-    OutFile.close()        
-    return 0
 
 def write_stats(df_list, Output):
     df = pandas.concat(df_list)
