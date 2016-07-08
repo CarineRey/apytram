@@ -54,8 +54,6 @@ from lib import Aligner
 def strict_positive_integer(x):
     x = int(x)
     if type(x) != type(1) or x <= 0:
-        print type(x) != type(1) 
-        print x < 0
         raise argparse.ArgumentTypeError("Must be an integer superior to 0")
     return (x)
 
@@ -252,7 +250,8 @@ fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARN)
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
+#ch.setLevel(logging.DEBUG)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
@@ -419,6 +418,7 @@ for item in DBs:
     new_species.FinalMinLength = FinalMinLength
     new_species.FinalMinIdentityPercentage = FinalMinIdentityPercentage
     new_species.FinalMinAliLength = FinalMinAliLength
+    new_species.keep_tmp = args.keep_tmp
     
     s = item.split(":")
     
@@ -460,7 +460,6 @@ for item in FQs:
         (fq,species) = f
         if os.path.isfile(fq):
             if species in SpeciesNamesList:
-                print species
                 SpeciesList[SpeciesNamesList.index(species)].Fastq.append(fq)
             else:
                 logger.error("The species associted with %s is %s. But there is no database associated with the species %s." %(fq,species,species))
@@ -477,7 +476,7 @@ for item in FQs:
 logger.warning("Species:")
 for Species in SpeciesList:
     if Species.FormatedDatabase:
-        logger.warning("\t-%s ... Formated database" %(species))
+        logger.warning("\t-%s ... Formated database" %(Species.Species))
     elif Species.Fasta and Species.Fastq:
         logger.warning("\t-%s ... NO formated database. fasta AND fastq input files -> ERROR" %(Species.Species))
         error = True
@@ -486,30 +485,27 @@ for Species in SpeciesList:
     else:
         logger.warning("\t-%s ... NO formated database and NO input fasta/fastq files -> ERROR" %(Species.Species))
         error = True
-    if not error:
-        Species.set_TmpDir(TmpDirName)
-        Species.set_OutputDir(args.output_prefix)
 
 logger.debug("Time to parse input command line: %s" %(time.time() - start_time))
 
 if error:
     logger.error("Error(s) occured, see above")
-    ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
+    ApytramNeeds.end(1, TmpDirName, keep_tmp = args.keep_tmp)
 
 ### If iteration begin not from 1, the temporary directory must be given by the user
 if StartIteration != 1 and not args.tmp:
     logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
-    ApytramNeeds.end(1,TmpDirName,keep_tmp = args.keep_tmp)
+    ApytramNeeds.end(1, TmpDirName, keep_tmp = args.keep_tmp)
 
 
-
-#Get the available free space of the tmp dir
+### Get the available free space of the tmp dir
 FreeSpaceTmpDir = ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s" %(FreeSpaceTmpDir,TmpDirName))
 
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList :
+    Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
     if not Species.FormatedDatabase:
         Species.build_database(FreeSpaceTmpDir,TmpDirName)
 
@@ -517,6 +513,8 @@ for Species in SpeciesList :
 if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
     ApytramNeeds.end(0,TmpDirName,keep_tmp = args.keep_tmp)
+else:
+    Species.set_OutputDir(args.output_prefix)
 
 ### Set up the output directory
 if args.output_prefix:
@@ -533,10 +531,16 @@ else:
 
 
 for Query in QueriesList:
+    logger.info("NEW QUERY: %s" %(Query.Name))
+
     Query.OutPrefixName = "%s_%s" %(OutPrefixName,Query.Name)
     Query.NbSpecies = len(SpeciesNamesList)
     Query.StartTime = time.time()
-    #Iterative process
+    
+    for Species in SpeciesList:
+        Species.new_query(Query)
+    
+    #Iterative process  
     while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()):
         Query.AbsIteration +=1
         Query.SpeciesWithoutImprovment[Query.AbsIteration] = []       
@@ -728,37 +732,32 @@ for Query in QueriesList:
             # Stats files
 
         else:
-            logger.warn("No results")
-
-
+            logger.warn("No results for %s" %(Species.Species))
 
         if args.stats:
-            start_output_stat = time.time()
             logger.info("Write statistics file (OutPrefix.stats.csv)")
             Query.StatsFileContent.extend(Species.get_stats())
-
-            if args.plot:
-                logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
-                ApytramNeeds.create_plot(Species.ExecutionStats.TimeStatsDict,
-                                         Species.ExecutionStats.IterStatsDict,
-                                         Query.OutPrefixName + "_" + Species.Species)
-                logger.debug("Writing stats file --- %s seconds ---" % (time.time() - start_output_stat))
-
-
-    logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
+            Query.TimeStatsDictList.append(Species.ExecutionStats.TimeStatsDict)
+            Query.IterStatsDictList.append(Species.ExecutionStats.IterStatsDict)
 
     ### Write fasta outputfiles
     if Query.BestOutFileContent:
-        ApytramNeeds.write_in_file("\n".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
+        ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
     if Query.OutFileContent:
         Query.FinalFastaFileName = Query.OutPrefixName + ".fasta"
-        ApytramNeeds.write_in_file("\n".join(Query.OutFileContent), Query.FinalFastaFileName)
+        ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.FinalFastaFileName)
     if Query.StatsFileContent:
         ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
+        if args.plot:
+            logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
+            ApytramNeeds.create_plot(Query.TimeStatsDictList,
+                                     Query.IterStatsDictList,
+                                     SpeciesNamesList,
+                                     Query.OutPrefixName)
 
     if args.plot_ali and Query.FinalFastaFileName:
         start_output_ali = time.time()
-        Query.measure_coverage()
+        Query.measure_final_coverage()
         LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
         if LengthAlignment <= 3100:
             logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
@@ -768,7 +767,8 @@ for Query in QueriesList:
         logger.info("Write the final alignment in OutPrefix.ali.fasta")
         ApytramNeeds.write_in_file(Query.MafftResult,"%s.ali.fasta" %(Query.OutPrefixName))
         logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
-    
+
+    logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
     
 
 logger.info("--- %s seconds ---" % (time.time() - start_time))

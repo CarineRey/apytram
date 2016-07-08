@@ -189,7 +189,7 @@ class RNA_species:
         return CheckDatabase_BlastdbcmdProcess.is_database()
 
     def set_TmpDir(self,TmpDirName):
-        self.TmpDirName = TmpDirName + "/" + self.Species
+        self.TmpDirName = TmpDirName
         if not os.path.isdir(self.TmpDirName):
             self.logger.info("The temporary directory %s does not exist, it will be created" % (self.TmpDirName))
             os.makedirs(self.TmpDirName)
@@ -224,7 +224,7 @@ class RNA_species:
             for fastq in self.Fastq:
                 if not os.path.isfile(fastq):
                     logger.error("The fastq file (%s) does not exist." %(fastq))
-                    end(1,TmpDirName)
+                    ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
                 # Format the fastq file in fasta
             self.InputFastaFilename = "%s/input_fastq.fasta" %(self.TmpDirName)
             self.logger.info("Convert the fastq file in fasta format")
@@ -233,26 +233,26 @@ class RNA_species:
             self.logger.debug("size of input files: %s " %input_size)
             if input_size*1.1 > FreeSpaceTmpDir:
                 self.logger.error("Not enough available free space in %s to convert input files" %TmpDirName)
-                end(1,TmpDirName)
+                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             if input_size*2.5 > FreeSpaceDBDir:
                 self.logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
-                end(1,TmpDirName)
+                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             (out,err) = ApytramNeeds.fastq2fasta(" ".join(self.Fastq),self.InputFastaFilename)
             if err:
                 self.logger.error(err)
-                end(1,TmpDirName)
+                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             self.logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif self.Fasta:
             for fasta in self.Fasta:
                 if not os.path.isfile(fasta):
                     self.logger.error("The fasta file (%s) does not exist." %fasta)
-                    end(1,TmpDirName)
+                    ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             # Check enough available free space
             input_size = ApytramNeeds.get_size(self.Fasta)
             self.logger.debug("size of input files: %s " %input_size)
             if input_size*2.5 > FreeSpaceDBDir:
                 self.logger.error("Not enough available free space in %s to build the database" %DatabaseDirName)
-                end(1,TmpDirName)
+                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             # Concatenate fasta files
             if len(self.Fasta) > 1:
                 if input_size*1.1 > FreeSpaceTmpDir:
@@ -524,8 +524,6 @@ class RNA_species:
         self.add_iter_statistic("AverageScore", AverageScore)
           
     def filter_trinity_results_according_homology_results(self, final_iteration = False):
-        print self.FilteredTrinityFastaFilename
-        print self.PreviousFilteredTrinityFastaFilename
         
         if final_iteration:
             self.TrinityFastaFilename = self.FilteredTrinityFastaFilename
@@ -561,10 +559,10 @@ class RNA_species:
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
   
-    def compare_current_and_previous_iterations():
+    def compare_current_and_previous_iterations(self):
         self.logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
         start = time.time()
-        ExonerateProcess = Aligner.Exonerate(Species.FilteredTrinityFasta, Species.PreviousFilteredTrinityFasta)
+        ExonerateProcess = Aligner.Exonerate(self.FilteredTrinityFastaFilename, self.PreviousFilteredTrinityFastaFilename)
         # Keep only the best hit for each contigs
         ExonerateProcess.Bestn = 1
         ExonerateProcess.Model =  "est2genome"
@@ -572,7 +570,7 @@ class RNA_species:
         ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
         (out,err,ExonerateResult) = ExonerateProcess.get_output()
         
-        ApytramNeeds.write_in_file(ExonerateResult,self.ExonerateBetweenIterFile)
+        ApytramNeeds.write_in_file(ExonerateResult,self.ExonerateBetweenIterFilename)
 
         AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
         
@@ -601,8 +599,25 @@ class RNA_species:
         self.add_iter_statistic("StrictCoverage", StrictCoverage)
         self.add_iter_statistic("LargeCoverage", LargeCoverage)
         self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
-                      
+
+	def tmp_dir_clean_up(TmpDirName,i):
+		if i == 1 :
+			FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
+							  "%s/input_fasta.fasta" %TmpDirName]
+		else:
+			FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
+							"%s/ReadNames.%d.1.txt" %(TmpDirName,i),
+							"%s/ReadNames.%d.2.txt" %(TmpDirName,i),
+							"%s/Reads.%d.fasta" %(TmpDirName,i),
+							"%s/Reads.%d.1.fasta" %(TmpDirName,i),
+							"%s/Reads.%d.2.fasta" %(TmpDirName,i),
+							"%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
+							"%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
+							"%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
+							"%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
+	
     def end_iteration(self):
+        
         iter_time = time.time() - self.ExecutionStats.StartIterTime
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["IterationTime"] = iter_time
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["CumulTime"] += iter_time
@@ -613,65 +628,50 @@ class RNA_species:
                        self.get_time_statistic("Exonerate_1") + \
                        self.get_time_statistic("Exonerate_2")
         
+        
+        self.TrinityExonerateFilename = ""
+        
+			
         self.add_time_statistic("Python", inter = NoPythonTime )
         self.logger.debug("Python --- %s seconds ---" %(self.get_time_statistic("Python")))
-            
-    def write_fasta_apytram_outputs(self, Query, no_best_file = False, only_best_file = False):
-        "Return fasta files with new names depending on the self.ExonerateResultsDict and options"
-        self.logger.info("Write outputfiles for %s" %(self.Species))
-        OutputFastaExtensions = []
-        if not no_best_file:
-            # Best sequences
-            OutputFastaExtensions.append(".best.fasta")
-        if not only_best_file:
-            # Last iteration sequences
-            OutputFastaExtensions.append(".fasta")
         
-        if not OutputFastaExtensions:
-            self.logger.error("No output files to write !")
-        else:
-            Header = self.TrinityExonerateRyo.replace('%',"").replace("\n","").split()
-            df = pandas.DataFrame(self.TrinityExonerateResultsDict, index = Header)
-            
-            # read self.FilteredTrinity
-            File = open(self.FilteredTrinityFasta,"r")
-            Fasta = File.read().strip().split("\n")
-            File.close()
+    def new_query(self, Query):
+		
+		# Cleaning
+        FilesToRemoves = [ self.TrinityFastaFilename,
+						   self.FilteredTrinityFastaFilename
+						 ]
 
-            for OutFastaExtension in OutputFastaExtensions:
-                ValidatedNames = []
-                if (OutFastaExtension == ".fasta") :
-                    ValidatedNames = self.FilteredSequenceNames
-                    Message = self.Species + "_"
-                else:
-                    ValidatedNames = self.BestScoreNames.values()
-                    Message = self.Species + "_best_"
-                
-                name = ""
-                sequence = ""
-                string_list = []
-                i = 1
-                for line in Fasta:
-                    if re.match(">",line):
-                        name = line.split()[0].replace(">","")
-                        if name in ValidatedNames:
-                            string_list.append(">APYTRAM_%s%d.len=%s.[%s]\n" %(Message,i,df[name]["ql"],df[name]["ti"]))
-                            i+=1
-                        else:
-                            name = ""                   
-                    elif name != "":
-                        string_list.append(line + "\n")
-                    else:
-                        pass
+        self.TrinityExonerateFilename = ""
+        		
+        #Build a new tmp dir
+        self.set_TmpDir("%s/%s/%s" %(Query.TmpDirName, Query.Name, self.Species))
+        
+        
+        self.ExecutionStats = Exec_stats(time.time())
+        self.CurrentIteration = 0
+        self.FinalIteration = 0
+        self.Improvment = True
+        self.CompletedIteration = True
 
-                # Write sequences
-                ApytramNeeds.write_in_file("".join(string_list),Query.OutPrefixName + "_" + self.Species + OutFastaExtension)
-       
+        # Intermediary files
+
+        self.ReadNamesFilename = ""
+        self.TrinityFastaFilename = ""
+        self.FilteredTrinityFastaFilename = ""
+        self.TrinityExonerateResult = ""
+        self.TrinityExonerateFilename = ""
+        
+        self.FilteredTrinityFasta = ApytramNeeds.Fasta()
+        			
     def get_output_fasta(self, fasta = "all"):
         assert fasta in ["all","best"], "fasta must be all or best"
-        
+        if fasta == "all":
+            filename = "OutPrefix.fasta"
+        else:
+            filename = "OutPrefix.best.fasta"
         "Return fasta files with new names depending homology scores and options"
-        self.logger.info("Prepare outputfiles for %s" %(self.Species))
+        self.logger.info("Prepare %s outputfile for %s" %(filename,self.Species))
         OutputFastaExtensions = []
         if fasta == "best":
             # Best sequences
@@ -694,11 +694,6 @@ class RNA_species:
 
 
 
-#   def new_query(self):
- 
-      
-
-
 #### query class
 
 class Query:
@@ -707,6 +702,7 @@ class Query:
         self.Name = Name
         self.RawQuery = QueryPath
         self.SequenceNb = ApytramNeeds.count_sequences(QueryPath)
+        self.FinalFastaFileName = ""
         
         #Read fasta
         QueryFasta = ApytramNeeds.Fasta()
@@ -715,7 +711,6 @@ class Query:
         #Get Sequences names
         self.ReferenceNames = QueryFasta.Names
         
-
         self.AlignedQuery = ""
         
         
@@ -730,6 +725,8 @@ class Query:
         self.BestOutFileContent = []
         self.OutFileContent = []
         self.StatsFileContent = []
+        self.TimeStatsDictList = []
+        self.IterStatsDictList = []
         
         
     def continue_iter(self):
@@ -753,7 +750,7 @@ class Query:
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
-    def measure_coverage(self):
+    def measure_final_coverage(self):
         # Use Mafft
         start = time.time()
         MafftProcess = Aligner.Mafft(self.AlignedQuery)

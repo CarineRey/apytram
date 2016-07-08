@@ -84,7 +84,7 @@ class Sequence:
         self.Reverse = False
     
     def __str__(self):
-        return(">" + self.Name + "\n" + '\n'.join(self.Sequence[i:i+60] for i in range(0, len(self.Sequence), 60)))
+        return(">" + self.Name + "\n" + '\n'.join(self.Sequence[i:i+60] for i in range(0, len(self.Sequence), 60)) + "\n")
            
     def copy(self):
         ns = Sequence()
@@ -309,24 +309,6 @@ def remove_duplicated_read_names(File,logger = ""):
     elif logger:
         logger.error("File %s is not a valid path" %File)
 
-def tmp_dir_clean_up(TmpDirName,i):
-    if i == 1 :
-        FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
-                          "%s/input_fasta.fasta" %TmpDirName]
-    else:
-        FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
-                          "%s/ReadNames.%d.1.txt" %(TmpDirName,i),
-                          "%s/ReadNames.%d.2.txt" %(TmpDirName,i),
-                          "%s/Reads.%d.fasta" %(TmpDirName,i),
-                          "%s/Reads.%d.1.fasta" %(TmpDirName,i),
-                          "%s/Reads.%d.2.fasta" %(TmpDirName,i),
-                          "%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
-                          "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
-                          "%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
-                          "%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
-    for f in FilesToRemoves:
-        if os.path.isfile(f):
-            os.remove(f)
 
 def get_free_space(DirPath):
     if not DirPath:
@@ -423,32 +405,40 @@ def write_stats(df_list, Output):
     df = pandas.concat(df_list)
     df.to_csv(Output, na_rep = "0.0",index=False)
 
-def create_plot(TimeStatsDict, IterStatsDict, OutPrefixName):
-    df_time = pandas.DataFrame(TimeStatsDict).T
-    df_iter = pandas.DataFrame(IterStatsDict).T
-  
-    with PdfPages("%s.stats.pdf" %(OutPrefixName)) as pdf:
-        ### Plot 1 ###
-        df_iter.plot(subplots=True,
-                     grid = True,
-                     legend = "best",
-                     figsize=(10, 20),
-                     style = "-o")
-        plt.xlabel('Iteration')
-        pdf.savefig()
-        plt.close()
-        
-        ### Plot 2 ###
-        df_time.plot(kind ='bar',
-                     grid = True,
-                     figsize=(10, 10),
-                     stacked=True,
-                     legend = "best")
-        plt.ylabel('seconds')
-        plt.xlabel('Iteration')
-        plt.title('Distribution of the execution time')
-        pdf.savefig()
-        plt.close()
+def create_plot(TimeStatsDictList, IterStatsDictList, SpeciesListNames, OutPrefixName):
+	with PdfPages("%s.stats.pdf" %(OutPrefixName)) as pdf:
+		for i in range(len(TimeStatsDictList)):
+			
+			TimeStatsDict = TimeStatsDictList[i]
+			IterStatsDict = IterStatsDictList[i]
+			species = SpeciesListNames[i]
+			
+			df_time = pandas.DataFrame(TimeStatsDict).T
+			df_iter = pandas.DataFrame(IterStatsDict).T
+	
+	
+			### Plot 1 ###
+			df_iter.plot(subplots=True,
+						grid = True,
+						legend = "best",
+						figsize=(10, 20),
+						style = "-o",
+						title = 'Evolution of some values - %s' %(species))
+			plt.xlabel('Iteration')
+			pdf.savefig()
+			plt.close()
+			
+			### Plot 2 ###
+			df_time.plot(kind ='bar',
+						grid = True,
+						figsize=(10, 10),
+						stacked=True,
+						legend = "best")
+			plt.ylabel('seconds')
+			plt.xlabel('Iteration')
+			plt.title('Distribution of the execution time - %s' %(species))
+			pdf.savefig()
+			plt.close()
 
 
 def calculate_coverage(AlignmentString, RefSeq):
