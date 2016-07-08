@@ -49,8 +49,6 @@ from lib import Aligner
 from lib import ApytramNeeds
 
 
-#### Execution stats class
-
 import pandas
 import matplotlib
 matplotlib.use("Agg")
@@ -136,7 +134,8 @@ class RNA_species:
         self.FinalIteration = 0
         self.Improvment = True
         self.CompletedIteration = True
-
+        self.Finished = False
+		
         # Intermediary files
 
         self.ReadNamesFilename = ""

@@ -547,39 +547,39 @@ for Query in QueriesList:
         logger.info("Iteration %d/%d" %(Query.AbsIteration,MaxIteration))
 
         for Species in SpeciesList:
-            # Build new baitsequences file
-            Query.new_species_iteration(SpeciesList)
-            
-            ### Make iterations
-            # Initialisation
-            Species.new_iteration()
-            logger.info("Start iteration %d/%d for %s" %(Species.CurrentIteration, MaxIteration, Species.Species))
+            if not Species.Finished:
+                # Build new baitsequences file
+                Query.new_species_iteration(SpeciesList)
 
-            ### Blast bait sequences on database of reads
-            # Write read names in ReadNamesFile if the file does not exist
-            if not os.path.isfile(Species.ReadNamesFilename):
-                Species.launch_Blastn(Query.BaitSequences,Threads)
-            else:
-                logger.warn("%s has already been created, it will be used" %Species.ReadNamesFilename )
+            if Species.Improvment:
+                Species.new_iteration()
+                logger.info("Start iteration %d/%d for %s" %(Species.CurrentIteration, MaxIteration, Species.Species))
 
-            if Species.PairedData:
-                # Get paired reads names and remove duplicated names
-                logger.info("Get paired reads names and remove duplicated names")
-                ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename,logger)
-            else:
-                # Remove duplicated names
-                logger.info("Remove duplicated names")
-                ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename,logger)
+                ### Blast bait sequences on database of reads
+                # Write read names in ReadNamesFile if the file does not exist
+                if not os.path.isfile(Species.ReadNamesFilename):
+                    Species.launch_Blastn(Query.BaitSequences,Threads)
+                else:
+                    logger.warn("%s has already been created, it will be used" %Species.ReadNamesFilename )
 
-            # Count the number of reads which will be used in the Trinity assembly
-            logger.info("Count the number of reads")
-            Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFilename)
-            Species.add_iter_statistic("ReadsNumber",Species.ReadsNumber)
+                if Species.PairedData:
+                    # Get paired reads names and remove duplicated names
+                    logger.info("Get paired reads names and remove duplicated names")
+                    ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename,logger)
+                else:
+                    # Remove duplicated names
+                    logger.info("Remove duplicated names")
+                    ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename,logger)
+                
+                # Count the number of reads which will be used in the Trinity assembly
+                logger.info("Count the number of reads")
+                Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFilename)
+                Species.add_iter_statistic("ReadsNumber",Species.ReadsNumber)
 
-            if not Species.ReadsNumber:
-                logger.warning("No read recruted by Blast at the iteration %s" %(Species.CurrentIteration))
-                Species.Improvment = False
-                Species.CompletedIteration = False
+                if not Species.ReadsNumber:
+                    logger.warning("No read recruted by Blast at the iteration %s" %(Species.CurrentIteration))
+                    Species.Improvment = False
+                    Species.CompletedIteration = False
 
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
@@ -686,6 +686,7 @@ for Query in QueriesList:
             if not Species.CompletedIteration:
                 logger.debug("Iteration stop before end")
                 Species.FinalIteration -= 1
+            if not Species.Improvment:
                 Query.SpeciesWithoutImprovment[Query.AbsIteration].append(Species.Species)
      
             Species.end_iteration() # just stop timer
