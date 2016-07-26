@@ -1,20 +1,22 @@
 FROM debian:jessie
 MAINTAINER Carine Rey carine.rey@ens-lyon.fr
-RUN apt-get update && \
-    apt-get install -qy git \
+
+RUN apt-get clean && apt-get update
+
+RUN apt-get install -qy git \
                         wget \
                         build-essential \
-						mafft \
-						exonerate \
-						python-numpy \				
-					    python-pandas \
-	                    python-matplotlib \
+			mafft \
+			exonerate \
+			python-numpy \				
+	                python-pandas \
+	                python-matplotlib \
 # to install trinity	                    
-	                    bowtie \ 
-	                    openjdk-7-jdk \
-	                    samtools=0.1.19-1 \ 
-	                    zlib1g-dev \
-	                    ncurses-dev 
+	                bowtie \ 
+	                openjdk-7-jdk \
+	                samtools=0.1.19-1 \ 
+	                zlib1g-dev \
+	                ncurses-dev 
 
 # install ncbi-blast+=2.2.28-2
 WORKDIR /opt
