@@ -722,17 +722,17 @@ for Query in QueriesList:
 
            start_output = time.time()
            if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter
-			   Species.rename_sequences()
+                Species.rename_sequences()
                # Prepare fasta output files by species
-               if not args.only_best_file:
-                   Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
-               if not args.no_best_file:
-                   Query.OutFileContent.extend(Species.get_output_fasta(fasta = "all"))
+                if not args.only_best_file:
+                    Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
+                if not args.no_best_file:
+                    Query.OutFileContent.extend(Species.get_output_fasta(fasta = "all"))
 
-               if args.plot_ali or args.stats:
-                   ### Calculate the coverage
-                   logger.info("Calculate the final coverage")
-                   Species.measure_coverage(Query)
+                if args.plot_ali or args.stats:
+                    ### Calculate the coverage
+                    logger.info("Calculate the final coverage")
+                    Species.measure_coverage(Query)
 
            Species.end_iteration()
 
