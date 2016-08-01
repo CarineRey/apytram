@@ -541,22 +541,23 @@ class RNA_species:
             # get sequence for filtered sequences in the trinityfasta
             self.FilteredTrinityFasta.complete_fasta(TrinityFasta)
 
-            if final_iteration:
-                # build dictionnary to rename sequences
-                Message = self.Species + "_"
-                NewnameDict = {}
-                i = 0
-                for Sequence in self.FilteredTrinityFasta.Sequences:
-                    i +=1
-                    OldName = Sequence.Name
-                    if Sequence.BestSequence:
-                        Message += "Best_"
-                    NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
-                    NewnameDict[OldName] = NewName
-
-                self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
+
+    def rename_sequences(self):
+        # build dictionnary to rename sequences
+        Message = self.Species + "_"
+        NewnameDict = {}
+        i = 0
+        for Sequence in self.FilteredTrinityFasta.Sequences:
+            i +=1
+            OldName = Sequence.Name
+            if Sequence.BestSequence:
+                Message += "Best_"
+            NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
+            NewnameDict[OldName] = NewName
+
+        self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
 
     def compare_current_and_previous_iterations(self):
         self.logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
