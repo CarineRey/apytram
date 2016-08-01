@@ -724,9 +724,9 @@ for Query in QueriesList:
            if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter
                 Species.rename_sequences()
                # Prepare fasta output files by species
-                if not args.only_best_file:
-                    Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
                 if not args.no_best_file:
+                    Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
+                if not args.only_best_file:
                     Query.OutFileContent.extend(Species.get_output_fasta(fasta = "all"))
 
                 if args.plot_ali or args.stats:
