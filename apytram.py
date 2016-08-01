@@ -539,7 +539,7 @@ else:
 for Query in QueriesList:
     logger.info("NEW QUERY: %s" %(Query.Name))
 
-    Query.OutPrefixName = "%s_%s" %(OutPrefixName,Query.Name)
+    Query.OutPrefixName = "%s.%s" %(OutPrefixName,Query.Name)
     Query.NbSpecies = len(SpeciesNamesList)
     Query.StartTime = time.time()
 
