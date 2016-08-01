@@ -221,7 +221,21 @@ def end(exit_code, TmpDirName, keep_tmp = False, logger=""):
     if not keep_tmp and "apytram" in TmpDirName:
         shutil.rmtree(TmpDirName)
     sys.exit(exit_code)
-      
+
+
+def set_directory_from_prefix(Prefix,DirType="",logger=""):
+        ### Set up the output directory
+        if Prefix:
+            DirName = os.path.dirname(Prefix)
+            if os.path.isdir(DirName):
+                if DirType and logger:
+                    logger.info("The %s directory %s exists" %(DirType,DirName))
+            elif DirName: # if DirName is not a empty string we create the directory
+                if DirType and logger:
+                    logger.info("The %s directory %s does not exist, it will be created" %(DirType,DirName))
+                os.makedirs(DirName)
+
+
 def fastq2fasta(FastqFile,FastaFile):
     ExitCode = 1
     command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)

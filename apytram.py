@@ -519,7 +519,7 @@ if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
     ApytramNeeds.end(0,TmpDirName,keep_tmp = args.keep_tmp)
 else:
-    Species.set_OutputDir(args.output_prefix)
+    ApytramNeeds.set_directory_from_prefix(args.output_prefix,"output",logger)
 
 ### Set up the output directory
 if args.output_prefix:
