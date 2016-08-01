@@ -334,8 +334,12 @@ logger.warning("Query:")
 
 QueriesNamesList = []
 QueriesList = []
-Query_name = 1
+
 for query in Queries:
+	if re.search(":",query):
+		(query,name) = query.split(":")
+	else:
+		name = ""
     if not os.path.isfile(query):
         logger.error("\t-%s ... ERROR (Don't exist)" %(query))
         error = True
@@ -343,10 +347,12 @@ for query in Queries:
         logger.error("\t-%s ... ERROR (empty)" %(query))
         error = True
     else:
-        new_query = ApytramClasses.Query(Query_name,query,logger)
+		if ! name :
+			name = os.path(basename(os.path.splitext(query)[0])
+        new_query = ApytramClasses.Query(name,query,logger)
         new_query.TmpDirName = TmpDirName
         logger.warning("\t-%s ... ok (%s sequences)" %(new_query.RawQuery,new_query.SequenceNb))
-        if not Query_name in QueriesList:
+        if not name in QueriesNamesList:
             new_query.AlignedQuery = new_query.RawQuery
             if new_query.SequenceNb !=1:
                 # If there are multiple probes, align them for the future coverage counter
@@ -371,8 +377,7 @@ for query in Queries:
             #        end(1,TmpDirName)
 
             QueriesList.append(new_query)
-            QueriesNamesList.append(Query_name)
-            Query_name +=1
+            QueriesNamesList.append(name)
         else:
             logger.error("""The name "%s" must have only one associated query file.You must chose between:\n\t%s\n\t%s"""
                         %(new_query.Name,
