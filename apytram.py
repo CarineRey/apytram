@@ -347,8 +347,8 @@ for query in Queries:
         logger.error("\t-%s ... ERROR (empty)" %(query))
         error = True
     else:
-        if ! name :
-            name = os.path(basename(os.path.splitext(query)[0])
+        if not name :
+            name = os.path.basename(os.path.splitext(query)[0])
         new_query = ApytramClasses.Query(name,query,logger)
         new_query.TmpDirName = TmpDirName
         logger.warning("\t-%s ... ok (%s sequences)" %(new_query.RawQuery,new_query.SequenceNb))
