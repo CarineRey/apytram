@@ -407,6 +407,7 @@ UniqSpecies_flag = True
 if len(DBs) > 1 :
     # There are several species:
     UniqSpecies_flag = False
+elif len(DBs) == 1 :
     if not re.search(":",DBs[0]):
         DBs[0] += ":SP"
 
