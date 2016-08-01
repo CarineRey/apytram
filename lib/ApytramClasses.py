@@ -71,7 +71,7 @@ class Exec_stats:
                              "Mafft":0,
                              "Python":0
                              }
-        
+
         New_Iter_stat_dic = {"IterationTime": 0,
                              "CumulTime": 0,
                              "LargeCoverage": 0,
@@ -95,11 +95,11 @@ class Exec_stats:
         self.IterAtributes = New_Iter_stat_dic.keys()
         self.StartTime = start_time
         self.StartIterTime = start_time
-        
+
     def new_iteration(self, i):
         self.TimeStatsDict[i] = {}
         self.IterStatsDict[i] = {"CumulTime": self.IterStatsDict[i-1]["CumulTime"]}
-            
+
 
 
 #### RNA sample class
@@ -135,34 +135,34 @@ class RNA_species:
         self.Improvment = True
         self.CompletedIteration = True
         self.Finished = False
-		
+
         # Intermediary files
 
         self.ReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
         self.TrinityExonerateResult = ""
-        
+
         # Constante
-        
+
         self.TrinityExonerateRyo = "%ti\t%qi\t%ql\t%tal\t%tl\t%tab\t%tae\t%s\t%pi\t%qab\t%qae\n"
-    
+
     def add_time_statistic(self, attribute, start = 0, inter = 0, end = 0):
         if not start:
             start = self.ExecutionStats.StartIterTime
-        
+
         if not end:
             end = time.time()
-            
+
         if attribute in self.ExecutionStats.TimeAtributes:
             self.ExecutionStats.TimeStatsDict[self.CurrentIteration][attribute] = end - inter - start
-            
+
     def get_time_statistic(self,attribute):
         if attribute in self.ExecutionStats.TimeStatsDict[self.CurrentIteration].keys():
             return(self.ExecutionStats.TimeStatsDict[self.CurrentIteration][attribute])
         else:
             return (0)
-    
+
     def add_iter_statistic(self, attribute, value, mode_add = False):
         if attribute in self.ExecutionStats.IterAtributes:
             if mode_add:
@@ -170,19 +170,19 @@ class RNA_species:
                 self.ExecutionStats.IterStatsDict[self.CurrentIteration][attribute] += value
             else:
                 self.ExecutionStats.IterStatsDict[self.CurrentIteration][attribute] = value
-    
+
     def get_iter_statistic(self,attribute, IterNb = None, RelIter = 0):
         if not IterNb:
             IterNb = self.CurrentIteration
         if RelIter:
             IterNb += RelIter
-        
+
         if IterNb in self.ExecutionStats.IterStatsDict.keys():
             if attribute in self.ExecutionStats.IterStatsDict[IterNb].keys():
                 return(self.ExecutionStats.IterStatsDict[IterNb][attribute])
         else:
             return (0)
-        
+
     def has_a_formated_database(self):
         CheckDatabase_BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName,"","")
         return CheckDatabase_BlastdbcmdProcess.is_database()
@@ -293,41 +293,41 @@ class RNA_species:
         else:
             self.add_time_statistic("DatabaseBuilding", start = start)
             self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
-            
+
     def new_iteration(self):
-        
+
         self.ExecutionStats.StartIterTime = time.time()
-        
+
         # Cleaning
-        
+
         # Previous Iteration
         self.PreviousReadNamesFilename = self.ReadNamesFilename
         self.PreviousFilteredTrinityFastaFilename = self.FilteredTrinityFastaFilename
 
         # New names files
-        
+
         self.CurrentIteration +=1
         self.Improvment = True
         self.CompletedIteration = True
-        
+
         self.ExecutionStats.new_iteration(self.CurrentIteration)
-        
+
         self.ReadNamesFilename = "%s/ReadNames.%d.txt" %(self.TmpDirName,self.CurrentIteration)
         self.ReadsNumber = 0
-        
+
         self.ReadNamesFilename_Right = "%s/ReadNames.%d.1.txt" % (self.TmpDirName,self.CurrentIteration)
         self.ReadNamesFilename_Left  = "%s/ReadNames.%d.2.txt" % (self.TmpDirName,self.CurrentIteration)
         self.ReadFastaFilename_Right     = "%s/Reads.%d.1.fasta"   % (self.TmpDirName,self.CurrentIteration)
         self.ReadFastaFilename_Left      = "%s/Reads.%d.2.fasta"   % (self.TmpDirName,self.CurrentIteration)
-        
+
         self.ReadFastaFilename      = "%s/Reads.%d.fasta"   % (self.TmpDirName,self.CurrentIteration)
-                    
+
         self.TrinityFastaFilename = "%s/Trinity_iter_%d" %(self.TmpDirName,self.CurrentIteration)
 
         self.TrinityExonerateFilename = "%s/Trinity_iter_%d.exonerate_cdna2g" %(self.TmpDirName,self.CurrentIteration)
-       
+
         self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
-    
+
     def launch_Blastn(self,BaitSequencesFilename,Threads):
         start = time.time()
         self.logger.info("Blast bait sequences on reads database")
@@ -336,11 +336,11 @@ class RNA_species:
         BlastnProcess.Task = "blastn"
         BlastnProcess.Threads = Threads
         BlastnProcess.OutFormat = "6 sacc"
-        
+
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast", start = start)
         self.logger.debug("Blast --- %s seconds ---" %(self.get_time_statistic("Blast")))
-        
+
     def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
         start = time.time()
         if self.DatabaseType in ["RF","FR"]:
@@ -351,7 +351,7 @@ class RNA_species:
             StrandList = [".1",".2"]
         else:
             StrandList = [""]
-        
+
         self.logger.info("Retrieve reads sequences")
         start_blastdbcmd_time = time.time()
         for strand in StrandList:
@@ -362,10 +362,10 @@ class RNA_species:
                 (out,err) = BlastdbcmdProcess.launch()
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
-        
+
         self.add_time_statistic("Blastdbcmd", start = start)
         self.logger.debug("Blastdbcmd --- %s seconds ---" %(self.get_time_statistic("Blastdbcmd")))
-        
+
     def launch_Trinity(self, Threads, Memory):
         start = time.time()
         self.logger.info("Launch Trinity")
@@ -376,7 +376,7 @@ class RNA_species:
                                                 left = self.ReadFastaFilename_Left)
             else:
                 TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFasta)
-            
+
             TrinityProcess.SS_lib_type = self.DatabaseType
         else:
             TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
@@ -385,21 +385,21 @@ class RNA_species:
         # If there is a huge number of reads, remove duplicated reads
         if self.ReadsNumber > 1000:
             TrinityProcess.NormalizeReads = True
-        
+
         TrinityProcess.CPU = Threads
         TrinityProcess.max_memory = Memory
         # Keep only contig with a length superior to MinLength
         TrinityProcess.MinLength = self.MinLength
-        
+
         # Use the  --full_cleanup Trinity option to keep only the contig file
         TrinityProcess.FullCleanup = True
         if not os.path.isfile(self.TrinityFastaFilename+".Trinity.fasta"):
             (out,err,ExitCode) = TrinityProcess.launch()
         else:
             self.logger.warn("%s has already been created, it will be used" %(self.TrinityFastaFilename+".Trinity.fasta") )
-        
+
         self.TrinityFastaFilename = self.TrinityFastaFilename + ".Trinity.fasta"
-        
+
         if not os.path.isfile(self.TrinityFastaFilename):
             if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
@@ -407,10 +407,10 @@ class RNA_species:
             elif ExitCode != 0:
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
-        
+
         self.add_time_statistic("Trinity", start = start)
         self.logger.debug("Trinity --- %s seconds ---" %(self.get_time_statistic("Trinity")))
-           
+
     def get_homology_between_trinity_results_and_references(self,Query):
         # Use Exonerate
         start = time.time()
@@ -423,7 +423,7 @@ class RNA_species:
         (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
         # Write the result in a file
         if self.TrinityExonerateResult:
-            ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)       
+            ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)
         else:
             self.logger.info("Reconstructed sequences but no homologous with references")
             self.logger.info("Try to get homologies with a more sensible model")
@@ -439,13 +439,13 @@ class RNA_species:
             # Write the result in a file
             if self.TrinityExonerateResult:
                 ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)
-        
+
         self.add_time_statistic("Exonerate_1", start = start)
         self.logger.debug("Exonerate_1 --- %s seconds ---" %(self.get_time_statistic("Exonerate_1")))
-    
+
     def read_and_parse_exonerate_results(self, final_iteration = False):
         "Return a list of Sequences if the identity percentage is superior to MinIdentityPercentage and the alignment length is superior to MinAliLen "
-        
+
         if final_iteration:
             self.logger.info("Filter sequence with a identity percentage superior to %d and a percentage alignment len %d" %(self.FinalMinIdentityPercentage, self.FinalMinAliLength))
             minidentypercentage =  self.FinalMinIdentityPercentage
@@ -453,7 +453,7 @@ class RNA_species:
             minlengthpercentage = self.FinalMinLength
             minalilengthpercentage = self.FinalMinAliLength
         else:
-            self.logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(self.MinIdentityPercentage, self.MinAliLength))   
+            self.logger.info("Filter sequence with a identity percentage superior to %d and a alignment len %d" %(self.MinIdentityPercentage, self.MinAliLength))
             minidentypercentage = self.MinIdentityPercentage
             minalilength = self.MinAliLength
             minlengthpercentage = 0
@@ -461,14 +461,14 @@ class RNA_species:
 
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
         BestScoreNames = {}
-        
+
         HomologyScoreList = self.TrinityExonerateResult.strip().split("\n")
-        
+
         for line in HomologyScoreList:
             ListLine = line.split("\t")
             (ti,qi) = ListLine[:2]
             (ql,tal,tl,tab,tae,score,pi,qab,qae) = [float(x) for x in ListLine[2:]]
-            
+
             if (pi >=  minidentypercentage) and (tal >= minalilength) and (ql >= minlengthpercentage*tl/100) and (tal >= minalilengthpercentage*tl/100) :
                 # We keep this sequence
                 # A same sequence can be present 2 time if the hit scores are identical.
@@ -480,67 +480,67 @@ class RNA_species:
                         break
                 if not ever_seen:
                     new_sequence = ApytramNeeds.Sequence()
-                    new_sequence.add_attribute_from_exonerate(ListLine)     
+                    new_sequence.add_attribute_from_exonerate(ListLine)
 
                     self.add_iter_statistic("TotalIdentity", pi, mode_add = True)
                     if self.get_iter_statistic("BestIdentity") <= pi:
                         self.add_iter_statistic("BestIdentity",pi)
-                        
+
                     self.add_iter_statistic("TotalLength", ql, mode_add = True)
                     if self.get_iter_statistic("BestLength") <= ql:
                         self.add_iter_statistic("BestLength", ql)
-                        
+
                     self.add_iter_statistic("TotalScore", score, mode_add = True)
                     if self.get_iter_statistic("BestScore") <= score :
                         self.add_iter_statistic("BestScore", score)
                         BestScoreNames[ti] = qi
-    
+
                     # Check if the seqeunce is reverse
                     if ((qae-qab)*(tae-tab) < 0):
                         new_sequence.reverse = True
-                    
+
                     self.FilteredTrinityFasta.append(new_sequence)
-                    
+
         for (Target,Query) in BestScoreNames.items():
             for i in range(len(self.FilteredTrinityFasta.Sequences)):
                 if Query == self.FilteredTrinityFasta.Names[i]:
                     self.FilteredTrinityFasta.Sequences[i].BestSequence = Target
-                    
+
         NbContigs = len(self.FilteredTrinityFasta.Sequences)
         AverageIdentity = 0
         AverageLength = 0
         AverageScore = 0
-        
+
         self.add_iter_statistic("NbContigs",NbContigs)
-        
+
         if NbContigs:
-            AverageIdentity = self.get_iter_statistic("TotalIdentity") / NbContigs 
+            AverageIdentity = self.get_iter_statistic("TotalIdentity") / NbContigs
             AverageLength   = self.get_iter_statistic("TotalLength") / NbContigs
             AverageScore    = self.get_iter_statistic("TotalScore") / NbContigs
-            
+
         self.add_iter_statistic("AverageIdentity", AverageIdentity)
         self.add_iter_statistic("AverageLength", AverageLength)
         self.add_iter_statistic("AverageScore", AverageScore)
-          
+
     def filter_trinity_results_according_homology_results(self, final_iteration = False):
-        
+
         if final_iteration:
             self.TrinityFastaFilename = self.FilteredTrinityFastaFilename
-        
-        
+
+
         self.FilteredTrinityFastaFilename = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
-        
+
         # Get and save filtered sequence names and their homology score in self.FilteredTrinityFasta
         self.read_and_parse_exonerate_results(final_iteration = final_iteration)
 
         if self.FilteredTrinityFasta.Sequences: # If sequences pass the filter
-            # Read fasta       
+            # Read fasta
             TrinityFasta = ApytramNeeds.Fasta()
             TrinityFasta.read_fasta(FastaFilename = self.TrinityFastaFilename)
-            
+
             # get sequence for filtered sequences in the trinityfasta
             self.FilteredTrinityFasta.complete_fasta(TrinityFasta)
-            
+
             if final_iteration:
                 # build dictionnary to rename sequences
                 Message = self.Species + "_"
@@ -553,11 +553,11 @@ class RNA_species:
                         Message += "Best_"
                     NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
                     NewnameDict[OldName] = NewName
-                
+
                 self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
-  
+
     def compare_current_and_previous_iterations(self):
         self.logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
         start = time.time()
@@ -568,17 +568,17 @@ class RNA_species:
         # Customize the output format
         ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
         (out,err,ExonerateResult) = ExonerateProcess.get_output()
-        
+
         ApytramNeeds.write_in_file(ExonerateResult,self.ExonerateBetweenIterFilename)
 
         AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
-        
+
         if AlmostIdenticalResults:
             self.logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
             self.Improvment = False
-            
+
         self.add_time_statistic("Exonerate_2", start = start)
-        self.logger.debug("Exonerate_2 --- %s seconds ---" %(self.get_time_statistic("Exonerate_2")))     
+        self.logger.debug("Exonerate_2 --- %s seconds ---" %(self.get_time_statistic("Exonerate_2")))
 
     def measure_coverage(self,Query):
         # Use Mafft
@@ -590,63 +590,63 @@ class RNA_species:
         MafftProcess.AddOption = self.FilteredTrinityFastaFilename
         (self.MafftResult,err) = MafftProcess.get_output()
         self.add_time_statistic("Mafft", start = start)
-        
-        self.logger.debug("Mafft --- %s seconds ---" %(self.get_time_statistic("Mafft"))) 
-        
+
+        self.logger.debug("Mafft --- %s seconds ---" %(self.get_time_statistic("Mafft")))
+
         (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult,Query.ReferenceNames)
 
         self.add_iter_statistic("StrictCoverage", StrictCoverage)
         self.add_iter_statistic("LargeCoverage", LargeCoverage)
         self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
 
-	def tmp_dir_clean_up(TmpDirName,i):
-		if i == 1 :
-			FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
-							  "%s/input_fasta.fasta" %TmpDirName]
-		else:
-			FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
-							"%s/ReadNames.%d.1.txt" %(TmpDirName,i),
-							"%s/ReadNames.%d.2.txt" %(TmpDirName,i),
-							"%s/Reads.%d.fasta" %(TmpDirName,i),
-							"%s/Reads.%d.1.fasta" %(TmpDirName,i),
-							"%s/Reads.%d.2.fasta" %(TmpDirName,i),
-							"%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
-							"%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
-							"%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
-							"%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
-	
+    def tmp_dir_clean_up(TmpDirName,i):
+        if i == 1 :
+            FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
+                              "%s/input_fasta.fasta" %TmpDirName]
+        else:
+            FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
+                            "%s/ReadNames.%d.1.txt" %(TmpDirName,i),
+                            "%s/ReadNames.%d.2.txt" %(TmpDirName,i),
+                            "%s/Reads.%d.fasta" %(TmpDirName,i),
+                            "%s/Reads.%d.1.fasta" %(TmpDirName,i),
+                            "%s/Reads.%d.2.fasta" %(TmpDirName,i),
+                            "%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
+                            "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
+                            "%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
+                            "%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
+
     def end_iteration(self):
-        
+
         iter_time = time.time() - self.ExecutionStats.StartIterTime
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["IterationTime"] = iter_time
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["CumulTime"] += iter_time
-        
+
         NoPythonTime = self.get_time_statistic("Blast") + \
                        self.get_time_statistic("Blastdbcmd") + \
                        self.get_time_statistic("Trinity") + \
                        self.get_time_statistic("Exonerate_1") + \
                        self.get_time_statistic("Exonerate_2")
-        
-        
-        self.TrinityExonerateFilename = ""
-        
-			
-        self.add_time_statistic("Python", inter = NoPythonTime )
-        self.logger.debug("Python --- %s seconds ---" %(self.get_time_statistic("Python")))
-        
-    def new_query(self, Query):
-		
-		# Cleaning
-        FilesToRemoves = [ self.TrinityFastaFilename,
-						   self.FilteredTrinityFastaFilename
-						 ]
+
 
         self.TrinityExonerateFilename = ""
-        		
+
+
+        self.add_time_statistic("Python", inter = NoPythonTime )
+        self.logger.debug("Python --- %s seconds ---" %(self.get_time_statistic("Python")))
+
+    def new_query(self, Query):
+
+        # Cleaning
+        FilesToRemoves = [ self.TrinityFastaFilename,
+                           self.FilteredTrinityFastaFilename
+                         ]
+
+        self.TrinityExonerateFilename = ""
+
         #Build a new tmp dir
         self.set_TmpDir("%s/%s/%s" %(Query.TmpDirName, Query.Name, self.Species))
-        
-        
+
+
         self.ExecutionStats = Exec_stats(time.time())
         self.CurrentIteration = 0
         self.FinalIteration = 0
@@ -660,9 +660,9 @@ class RNA_species:
         self.FilteredTrinityFastaFilename = ""
         self.TrinityExonerateResult = ""
         self.TrinityExonerateFilename = ""
-        
+
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
-        			
+
     def get_output_fasta(self, fasta = "all"):
         assert fasta in ["all","best"], "fasta must be all or best"
         if fasta == "all":
@@ -682,7 +682,7 @@ class RNA_species:
         else:
             # Last iteration sequences
             return([str(self.FilteredTrinityFasta)])
-       
+
     def get_stats(self):
         df_time = pandas.DataFrame(self.ExecutionStats.TimeStatsDict)
         df_iter = pandas.DataFrame(self.ExecutionStats.IterStatsDict)
@@ -702,32 +702,32 @@ class Query:
         self.RawQuery = QueryPath
         self.SequenceNb = ApytramNeeds.count_sequences(QueryPath)
         self.FinalFastaFileName = ""
-        
+
         #Read fasta
         QueryFasta = ApytramNeeds.Fasta()
         QueryFasta.read_fasta(FastaFilename = QueryPath)
-        
+
         #Get Sequences names
         self.ReferenceNames = QueryFasta.Names
-        
+
         self.AlignedQuery = ""
-        
-        
+
+
         self.CumulIteration = 0
         self.AbsIteration = 0
-        
+
         self.Stop = False
         self.SpeciesWithoutImprovment = {0:[]}
         self.BaitSequences = ""
         self.PreviousBaitSequences = ""
-        
+
         self.BestOutFileContent = []
         self.OutFileContent = []
         self.StatsFileContent = []
         self.TimeStatsDictList = []
         self.IterStatsDictList = []
-        
-        
+
+
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
         if NbSpeciesWithoutImprovment == self.NbSpecies:
@@ -736,16 +736,16 @@ class Query:
             return(False)
         else:
             return(True)
-    
+
     def new_species_iteration(self,SpeciesList):
         self.CumulIteration += 1
         self.PreviousBaitSequences = self.BaitSequences
         self.BaitSequences = "%s/BaitSequences.%d.fasta" %(self.TmpDirName, self.CumulIteration)
         SpeciesCurrentReconstructedSequencesFileList = [Species.FilteredTrinityFastaFilename for Species in SpeciesList if Species.FilteredTrinityFastaFilename]
-        
+
         if self.AbsIteration == 1 :
             SpeciesCurrentReconstructedSequencesFileList.append(self.RawQuery)
-            
+
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
@@ -758,13 +758,13 @@ class Query:
         #MafftProcess.AdjustdirectionOption = True
         MafftProcess.AddOption = self.FinalFastaFileName
         (self.MafftResult,err) = MafftProcess.get_output()
-        
-        self.logger.debug("Mafft --- %s seconds ---" %(time.time() - start)) 
-        
+
+        self.logger.debug("Mafft --- %s seconds ---" %(time.time() - start))
+
         (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult,self.ReferenceNames)
 
         self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
-        
+
 
 
 

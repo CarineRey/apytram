@@ -424,9 +424,9 @@ for item in DBs:
     new_species.FinalMinIdentityPercentage = FinalMinIdentityPercentage
     new_species.FinalMinAliLength = FinalMinAliLength
     new_species.keep_tmp = args.keep_tmp
-    
+
     s = item.split(":")
-    
+
     if len(s) == 2 :
         (new_species.DatabaseName, new_species.Species) = s
         if not new_species.Species in SpeciesList:
@@ -541,14 +541,14 @@ for Query in QueriesList:
     Query.OutPrefixName = "%s_%s" %(OutPrefixName,Query.Name)
     Query.NbSpecies = len(SpeciesNamesList)
     Query.StartTime = time.time()
-    
+
     for Species in SpeciesList:
         Species.new_query(Query)
-    
-    #Iterative process  
+
+    #Iterative process
     while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()):
         Query.AbsIteration +=1
-        Query.SpeciesWithoutImprovment[Query.AbsIteration] = []       
+        Query.SpeciesWithoutImprovment[Query.AbsIteration] = []
         logger.info("Iteration %d/%d" %(Query.AbsIteration,MaxIteration))
 
         for Species in SpeciesList:
@@ -575,7 +575,7 @@ for Query in QueriesList:
                     # Remove duplicated names
                     logger.info("Remove duplicated names")
                     ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename,logger)
-                
+
                 # Count the number of reads which will be used in the Trinity assembly
                 logger.info("Count the number of reads")
                 Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFilename)
@@ -609,7 +609,7 @@ for Query in QueriesList:
                     ### Filter Trinity contigs to keep only homologous sequences of the reference genes
                     logger.info("Compare Trinity results with query sequences")
                     Species.get_homology_between_trinity_results_and_references(Query)
-                    
+
                     if not Species.TrinityExonerateResult:
                         logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
                         Species.Improvment = False
@@ -619,21 +619,21 @@ for Query in QueriesList:
                         # Keep only sequence with a identity percentage > MinIdentitypercentage on the whole hit
                         # and write filtered sequences in a file
                         Species.filter_trinity_results_according_homology_results()
-                        
+
                         ### Validated sequences (Species.FilteredTrinityFasta)  become bait sequences
 
                         if not Species.FilteredTrinityFasta.Sequences:
                             logger.warning("No sequence has passed the iteration filter at the iteration %s for %s" %(Species.CurrentIteration, Species.Species))
                             Species.Improvment = False
                             Species.CompletedIteration = False
-                        
+
                         else:
                             ### Compare sequences of the current iteration to those of the previous iteration
                             logger.info("Compare results with the previous iteration")
 
                             #Check if the number of contigs has changed
                             logger.info("Check if the number of contigs has changed")
-                            
+
                             if Species.get_iter_statistic("NbContigs") != Species.get_iter_statistic("NbContigs", RelIter = -1):
                                 logger.info("The number of contigs has changed")
                             elif Query.AbsIteration >= 2:
@@ -660,7 +660,7 @@ for Query in QueriesList:
                                  elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter = -1):
                                      logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
                                      Species.Improvment = False
-                            
+
                                  # Stop iteration if the RequiredCoverage is reached
                                  if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
                                      logger.info("This iteration attains the required bait sequence coverage (%d >= %d)" % (Species.get_iter_statistic("StrictCoverage"),RequiredCoverage))
@@ -685,7 +685,7 @@ for Query in QueriesList:
                             #    # Mafft alignment
                             #    ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
 
-            
+
             # End iteration
             Species.FinalIteration = Species.CurrentIteration
             if not Species.CompletedIteration:
@@ -693,13 +693,13 @@ for Query in QueriesList:
                 Species.FinalIteration -= 1
             if not Species.Improvment:
                 Query.SpeciesWithoutImprovment[Query.AbsIteration].append(Species.Species)
-     
+
             Species.end_iteration() # just stop timer
 
 
             logger.info("End of the iteration %s for %s : --- %s seconds ---" % (Species.CurrentIteration, Species.Species, Species.get_iter_statistic("IterationTime")))
 
-        
+
             if (time.time() - Query.StartTime) > MaxTime :
                 logger.warn("No new iteration for this query and this species will begin because the maximum duration (%s seconds) of the job is attained. (%s seconds)" %(MaxTime, (time.time() - Query.StartTime)))
                 Query.Stop = True
@@ -720,7 +720,7 @@ for Query in QueriesList:
                 Species.filter_trinity_results_according_homology_results(final_iteration = True)
 
            start_output = time.time()
-           if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter                
+           if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter
                # Prepare fasta output files by species
                if not args.only_best_file:
                    Query.BestOutFileContent.extend(Species.get_output_fasta(fasta = "best"))
@@ -733,7 +733,7 @@ for Query in QueriesList:
                    Species.measure_coverage(Query)
 
            Species.end_iteration()
-    
+
 
             # Stats files
 
@@ -775,7 +775,7 @@ for Query in QueriesList:
         logger.debug("Writing alignment plot and fasta --- %s seconds ---" % (time.time() - start_output_ali))
 
     logger.debug("Writing outputs --- %s seconds ---" % (time.time() - start_output))
-    
+
 
 logger.info("--- %s seconds ---" % (time.time() - start_time))
 logger.warning("END")
