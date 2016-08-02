@@ -495,7 +495,7 @@ class RNA_species:
                         self.add_iter_statistic("BestScore", score)
                         BestScoreNames[ti] = qi
 
-                    # Check if the seqeunce is reverse
+                    # Check if the sequence is reverse
                     if ((qae-qab)*(tae-tab) < 0):
                         new_sequence.Reverse = True
 
