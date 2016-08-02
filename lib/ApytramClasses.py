@@ -645,7 +645,7 @@ class RNA_species:
         self.TrinityExonerateFilename = ""
 
         #Build a new tmp dir
-        self.set_TmpDir("%s/%s/%s" %(Query.TmpDirName, Query.Name, self.Species))
+        self.set_TmpDir("%s/%s" %(Query.TmpDirName, self.Species))
 
 
         self.ExecutionStats = Exec_stats(time.time())
