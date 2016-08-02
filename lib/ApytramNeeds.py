@@ -264,9 +264,6 @@ def reverse_complement(Sequence_str):
     Reverse = Sequence_str.replace("\n","")[::-1]
     # Complement
     Complement = Reverse.translate(trantab)
-    Complement = '\n'.join(Complement[i:i+60] for i in range(0, len(Complement), 60))
-    if not re.search("\n$",Complement):
-        Complement += "\n"
     return Complement
 
 def write_in_file(String,Filename,mode = "w"):
