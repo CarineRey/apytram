@@ -355,6 +355,7 @@ for query in Queries:
         if not name :
             name = os.path.basename(os.path.splitext(query)[0])
         new_query = ApytramClasses.Query(name,query,logger)
+        new_query.TmpDirName = "%s/%s" %(TmpDirName,name)
         QueriesList.append(new_query)
         QueriesNamesList.append(name)
     else:
