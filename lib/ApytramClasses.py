@@ -403,7 +403,7 @@ class RNA_species:
         if not os.path.isfile(self.TrinityFastaFilename):
             if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-               self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(i,ExitCode) )
+               self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(self.CurrentIteration,ExitCode) )
             elif ExitCode != 0:
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
