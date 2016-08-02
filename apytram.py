@@ -227,6 +227,9 @@ MiscellaneousOptions.add_argument('-memory',  type=positive_integer,
 MiscellaneousOptions.add_argument('-time_max',  type=positive_integer,
                     help = "Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
                     default = 7200 )
+MiscellaneousOptions.add_argument('--write_even_empty',  action='store_true',
+                        default = False,
+                        help = "Write output fasta files, even if they must be empty. (Default: False)")
 ##############
 
 
@@ -749,11 +752,14 @@ for Query in QueriesList:
             Query.IterStatsDictList.append(Species.ExecutionStats.IterStatsDict)
 
     ### Write fasta outputfiles
-    if Query.BestOutFileContent:
-        ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.OutPrefixName + ".best.fasta")
-    if Query.OutFileContent:
-        Query.FinalFastaFileName = Query.OutPrefixName + ".fasta"
-        ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.FinalFastaFileName)
+    if Query.BestOutFileContent or args.write_even_empty:
+        if not args.no_best_file:
+            Query.FinalFastaFileName = Query.OutPrefixName + ".best.fasta"
+            ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.FinalFastaFileName)
+    if Query.OutFileContent or args.write_even_empty:
+        if not args.only_best_file:
+            Query.FinalFastaFileName = Query.OutPrefixName + ".fasta"
+            ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.FinalFastaFileName)
     if Query.StatsFileContent:
         ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
         if args.plot:
@@ -763,7 +769,7 @@ for Query in QueriesList:
                                      SpeciesNamesList,
                                      Query.OutPrefixName)
 
-    if args.plot_ali and Query.FinalFastaFileName:
+    if args.plot_ali and Query.FinalFastaFileName and (Query.OutFileContent or Query.BestOutFileContent):
         start_output_ali = time.time()
         Query.measure_final_coverage()
         LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
