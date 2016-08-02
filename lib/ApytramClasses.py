@@ -497,7 +497,7 @@ class RNA_species:
 
                     # Check if the seqeunce is reverse
                     if ((qae-qab)*(tae-tab) < 0):
-                        new_sequence.reverse = True
+                        new_sequence.Reverse = True
 
                     self.FilteredTrinityFasta.append(new_sequence)
 
