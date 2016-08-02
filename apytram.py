@@ -268,13 +268,15 @@ logger.warning("[Running in process...]\n[Warning messages may print, but they a
 logger.info(" ".join(sys.argv))
 
 
-error = False
+error = 0
+empty_queries = 0
+
 
 ### Set up the temporary directory
 if args.tmp:
     if not "apytram" in args.tmp:
         logger.error("""ERROR: Temporary directory name (-tmp) must contain "apytram" to safety reasons because it will be completly remove.""")
-        error = True
+        error += 1
     elif os.path.isdir(args.tmp):
         logger.info("The temporary directory %s exists" %(args.tmp))
     else:
@@ -296,7 +298,7 @@ MaxIteration = args.iteration_max
 
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
-    error = True
+    error += 1
 
 Evalue = args.evalue
 
@@ -345,10 +347,11 @@ for query in Queries:
         name = ""
     if not os.path.isfile(query):
         logger.error("\t-%s ... ERROR (Don't exist)" %(query))
-        error = True
+        error += 1
     elif not os.stat(query).st_size:
         logger.error("\t-%s ... ERROR (empty)" %(query))
-        error = True
+        error += 1
+        empty_queries += 1
     else:
         if not name :
             name = os.path.basename(os.path.splitext(query)[0])
@@ -386,7 +389,7 @@ for query in Queries:
                         %(new_query.Name,
                         new_query.RawQuery,
                         QueriesList[QueriesNamesList.index(new_query.Name)].RawQuery))
-            error = True
+            error += 1
 
 if not len(QueriesList):
     logger.warning("No query")
@@ -488,18 +491,21 @@ for Species in SpeciesList:
         logger.warning("\t-%s ... Formated database" %(Species.Species))
     elif Species.Fasta and Species.Fastq:
         logger.warning("\t-%s ... NO formated database. fasta AND fastq input files -> ERROR" %(Species.Species))
-        error = True
+        error += 1
     elif Species.Fasta or Species.Fastq:
         logger.warning("\t-%s ... NO formated database. (A database will be built)" %(Species.Species))
     else:
         logger.warning("\t-%s ... NO formated database and NO input fasta/fastq files -> ERROR" %(Species.Species))
-        error = True
+        error += 1
 
 logger.debug("Time to parse input command line: %s" %(time.time() - start_time))
 
-if error:
-    logger.error("Error(s) occured, see above")
-    ApytramNeeds.end(1, TmpDirName, keep_tmp = args.keep_tmp)
+if error > 0:
+    if args.write_even_empty and error == empty_queries:
+        logger.warning("Some query files are empty, but you use --write_even_empty option -> empty file will be create")
+    else:
+        logger.error("Error(s) occured, see above")
+        ApytramNeeds.end(1, TmpDirName, keep_tmp = args.keep_tmp)
 
 ### If iteration begin not from 1, the temporary directory must be given by the user
 if StartIteration != 1 and not args.tmp:
@@ -550,7 +556,7 @@ for Query in QueriesList:
         Species.new_query(Query)
 
     #Iterative process
-    while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()):
+    while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()) and Query.SequenceNb:
         Query.AbsIteration +=1
         Query.SpeciesWithoutImprovment[Query.AbsIteration] = []
         logger.info("Iteration %d/%d" %(Query.AbsIteration,MaxIteration))
