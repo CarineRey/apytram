@@ -352,6 +352,11 @@ for query in Queries:
         logger.error("\t-%s ... ERROR (empty)" %(query))
         error += 1
         empty_queries += 1
+        if not name :
+            name = os.path.basename(os.path.splitext(query)[0])
+        new_query = ApytramClasses.Query(name,query,logger)
+        QueriesList.append(new_query)
+        QueriesNamesList.append(name)
     else:
         if not name :
             name = os.path.basename(os.path.splitext(query)[0])
