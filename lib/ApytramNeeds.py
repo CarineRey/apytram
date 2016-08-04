@@ -73,6 +73,7 @@ class Sequence:
         self.ql =    ""
         self.tal =   ""
         self.tl =    ""
+        self.tab =   ""
         self.tae =   ""
         self.score = ""
         self.pi =    ""
