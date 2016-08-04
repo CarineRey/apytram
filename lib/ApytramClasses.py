@@ -375,7 +375,7 @@ class RNA_species:
                 TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, right = self.ReadFastaFilename_Right,
                                                 left = self.ReadFastaFilename_Left)
             else:
-                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFasta)
+                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
 
             TrinityProcess.SS_lib_type = self.DatabaseType
         else:
