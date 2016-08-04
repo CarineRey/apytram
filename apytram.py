@@ -362,7 +362,7 @@ for query in Queries:
         if not name :
             name = os.path.basename(os.path.splitext(query)[0])
         new_query = ApytramClasses.Query(name,query,logger)
-        new_query.TmpDirName = "%s/%s" %(TmpDirName,name)
+        new_query.TmpDirName = "%s/%s/" %(TmpDirName,name)
         ApytramNeeds.set_directory_from_prefix(new_query.TmpDirName ,"temporary",logger)
         logger.warning("\t-%s ... ok (%s sequences)" %(new_query.RawQuery,new_query.SequenceNb))
         if not name in QueriesNamesList:
