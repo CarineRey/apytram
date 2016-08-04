@@ -527,8 +527,8 @@ logger.debug("%s free space in %s" %(FreeSpaceTmpDir,TmpDirName))
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList :
-    Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
     if not Species.FormatedDatabase:
+        Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
         Species.build_database(FreeSpaceTmpDir,TmpDirName)
 
 ### If there is a query continue, else stop
