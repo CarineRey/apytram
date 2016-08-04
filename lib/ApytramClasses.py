@@ -495,9 +495,9 @@ class RNA_species:
                         self.add_iter_statistic("BestScore", score)
                         BestScoreNames[ti] = qi
 
-                    # Check if the sequence is reverse
+                    # Check if the sequence is complement
                     if ((qae-qab)*(tae-tab) < 0):
-                        new_sequence.Reverse = True
+                        new_sequence.Complement = True
 
                     self.FilteredTrinityFasta.append(new_sequence)
 

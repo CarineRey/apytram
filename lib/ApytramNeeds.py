@@ -82,7 +82,7 @@ class Sequence:
 
         ### Caracteristics
         self.BestSequence = ""
-        self.Reverse = False
+        self.Complement = False
 
     def __str__(self):
         return(">" + self.Name + "\n" + '\n'.join(self.Sequence[i:i+60] for i in range(0, len(self.Sequence), 60)) + "\n")
@@ -143,9 +143,9 @@ class Fasta:
 
     def append(self,new_sequence):
         assert isinstance(new_sequence, Sequence), "Sequence must belong to the Sequence class"
-        if new_sequence.Reverse and new_sequence.Sequence:
-            new_sequence.Sequence = reverse_complement(new_sequence.Sequence)
-            new_sequence.Reverse = False
+        if new_sequence.Complement and new_sequence.Sequence:
+            new_sequence.Sequence = complement(new_sequence.Sequence)
+            new_sequence.Complement = False
 
         self.Sequences.append(new_sequence)
         self.Names.append(new_sequence.Name)
@@ -257,14 +257,12 @@ def cat_fasta(FastaFiles,CatFastaFile):
     (out, err) = p.communicate()
     return (out, err)
 
-def reverse_complement(Sequence_str):
+def complement(Sequence_str):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
     outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
     trantab = string.maketrans(intab, outtab)
-    # Reverse
-    Reverse = Sequence_str.replace("\n","")[::-1]
     # Complement
-    Complement = Reverse.translate(trantab)
+    Complement = Sequence_str.translate(trantab)
     return Complement
 
 def write_in_file(String,Filename,mode = "w"):
