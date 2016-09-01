@@ -261,8 +261,10 @@ def complement(Sequence_str):
     intab = "ABCDGHMNRSTUVWXYabcdghmnrstuvwxy"
     outtab = "TVGHCDKNYSAABWXRtvghcdknysaabwxr"
     trantab = string.maketrans(intab, outtab)
+    # Reverse
+    Reverse = Sequence_str.replace("\n","")[::-1]
     # Complement
-    Complement = Sequence_str.translate(trantab)
+    Complement = Reverse.translate(trantab)
     return Complement
 
 def write_in_file(String,Filename,mode = "w"):
