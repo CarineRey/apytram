@@ -546,10 +546,10 @@ class RNA_species:
 
     def rename_sequences(self):
         # build dictionnary to rename sequences
-        Message = self.Species + "_"
         NewnameDict = {}
         i = 0
         for Sequence in self.FilteredTrinityFasta.Sequences:
+            Message = self.Species + "_"
             i +=1
             OldName = Sequence.Name
             if Sequence.BestSequence:
