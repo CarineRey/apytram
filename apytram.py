@@ -227,6 +227,8 @@ MiscellaneousOptions.add_argument('-time_max', type=positive_integer,
 MiscellaneousOptions.add_argument('--write_even_empty', action='store_true',
                         default=False,
                         help="Write output fasta files, even if they must be empty. (Default: False)")
+MiscellaneousOptions.add_argument('--debug', action='store_true', default=False,
+                   help="debug mode, default False")
 ##############
 
 
@@ -243,14 +245,19 @@ if args.log:
 LogFile = args.log
 # create logger with 'spam_application'
 logger = logging.getLogger('apytram')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # create file handler which logs even debug messages
 fh = logging.FileHandler(LogFile)
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARN)
-ch.setLevel(logging.INFO)
+if args.debug:
+    ch.setLevel(logging.DEBUG)
+    fh.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
+else:
+    ch.setLevel(logging.WARN)
+
 #ch.setLevel(logging.DEBUG)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
