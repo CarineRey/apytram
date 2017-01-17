@@ -725,6 +725,38 @@ class Query:
         self.TimeStatsDictList = []
         self.IterStatsDictList = []
 
+    def initialization(self):
+        self.AlignedQuery = self.RawQuery
+        if self.SequenceNb != 1:
+            # If there are multiple probes, align them for the future coverage counter
+            # Use Mafft
+            start_mafft_time = time.time()
+            MafftProcess = Aligner.Mafft(self.RawQuery)
+            MafftProcess.QuietOption = True
+            MafftProcess.AutoOption = True
+            (MafftResult, err) = MafftProcess.get_output()
+            self.AlignedQuery = "%s/References.ali.fasta" %(self.TmpDirName)
+            ApytramNeeds.write_in_file(MafftResult, self.AlignedQuery)
+            self.logger.debug("mafft --- %s seconds ---", str(time.time() - start_mafft_time))
+
+        #remove - in sequences
+
+        self.logger.debug("Remove - in %s" ,self.RawQuery)
+        query = ApytramNeeds.Fasta()
+        query.read_fasta(FastaFilename=self.RawQuery)
+        query.dealign_fasta()
+        self.RawQuery = "%s/References.nogap.fasta" %(self.TmpDirName)
+        query.write_fasta(self.RawQuery)
+
+            # # If the -pep option is used, the -q option must be precised
+            # if args.query_pep:
+            #   if not os.path.isfile(args.query_pep):
+            #        logger.error(args.query_pep+" (-pep) is not a file.")
+            #        end(1,TmpDirName)
+            #
+            #    if not args.query:
+            #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
+            #        end(1,TmpDirName)
 
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])

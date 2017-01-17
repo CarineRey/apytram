@@ -366,29 +366,7 @@ for query in Queries:
         ApytramNeeds.set_directory_from_prefix(new_query.TmpDirName, "temporary", logger)
         logger.warning("\t-%s %s ... ok (%s sequences)", name, new_query.RawQuery, new_query.SequenceNb)
         if not name in QueriesNamesList:
-            new_query.AlignedQuery = new_query.RawQuery
-            if new_query.SequenceNb != 1:
-                # If there are multiple probes, align them for the future coverage counter
-                # Use Mafft
-                start_mafft_time = time.time()
-                MafftProcess = Aligner.Mafft(new_query.RawQuery)
-                MafftProcess.QuietOption = True
-                MafftProcess.AutoOption = True
-                (MafftResult, err) = MafftProcess.get_output()
-                new_query.AlignedQuery = "%s/References.ali.fasta" %(new_query.TmpDirName)
-                ApytramNeeds.write_in_file(MafftResult, new_query.AlignedQuery)
-                logger.debug("mafft --- %s seconds ---", str(time.time() - start_mafft_time))
-
-            # # If the -pep option is used, the -q option must be precised
-            # if args.query_pep:
-            #   if not os.path.isfile(args.query_pep):
-            #        logger.error(args.query_pep+" (-pep) is not a file.")
-            #        end(1,TmpDirName)
-            #
-            #    if not args.query:
-            #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
-            #        end(1,TmpDirName)
-
+            new_query.initialization()
             QueriesList.append(new_query)
             QueriesNamesList.append(name)
         else:

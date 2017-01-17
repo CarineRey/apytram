@@ -188,6 +188,13 @@ class Fasta:
                 FilteredFasta.append(s)
         return FilteredFasta
 
+    def dealign_fasta(self):
+        DealignedFasta = Fasta()
+        for s in self.Sequences:
+            s.Sequence = s.Sequence.replace("-", "")
+            DealignedFasta.append(s)
+        return DealignedFasta
+
     def complete_fasta(self,NewInfoFasta):
         assert isinstance(NewInfoFasta, Fasta), "NewInfoFasta must belong to the Fasta class"
         for i in range(len(self.Sequences)):
