@@ -344,7 +344,7 @@ class RNA_species:
 
     def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
         start = time.time()
-        if self.DatabaseType in ["RF","FR"]:
+        if self.PairedData:
             self.logger.info("Split read names depending on 1/ or 2/")
             (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ReadNamesFilename,self.ReadNamesFilename_Right,self.ReadNamesFilename_Left)
             if err:
@@ -371,18 +371,14 @@ class RNA_species:
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
-        if self.StrandedData:
-            if self.DatabaseType in ["RF","FR"]:
-                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, right = self.ReadFastaFilename_Right,
-                                                left = self.ReadFastaFilename_Left)
-            else:
-                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
-
-            TrinityProcess.SS_lib_type = self.DatabaseType
+        if self.PairedData:
+            TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename,
+                                             right = self.ReadFastaFilename_Right,
+                                             left = self.ReadFastaFilename_Left)
         else:
             TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
-            if self.PairedData:
-                TrinityProcess.RunAsPaired = True
+        if self.StrandedData:
+            TrinityProcess.SS_lib_type = self.DatabaseType
         # If there is a huge number of reads, remove duplicated reads
         if self.ReadsNumber > 1000:
             TrinityProcess.NormalizeReads = True

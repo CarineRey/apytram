@@ -408,14 +408,25 @@ SpeciesList = []
 SpeciesNamesList = []
 
 DBs = args.database.split(",")
+UniqSpecies_flag = True
+
+if len(DBs) > 1:
+    # There are several species:
+    UniqSpecies_flag = False
+elif len(DBs) == 1:
+    if not re.search(":", DBs[0]):
+        DBs[0] += ":SP"
+
 DB_types_dict = {}
 for item in args.database_type.split(","):
     db_type_sp = item.split(":")
+    logger.debug(db_type_sp)
     if len(db_type_sp) == 2:
         db_type = db_type_sp[1]
         DB_types_dict[db_type] = db_type_sp[0]
-    else:
-        DB_types_dict[db_type_sp[1]] = ""
+    elif len(db_type_sp) == 1 and len(DBs) == 1:
+        sp = DBs[0].split(":")[1]
+        DB_types_dict[sp] = db_type_sp[0]
 
 
 FAs = []
@@ -425,14 +436,7 @@ if args.fasta:
 if args.fastq:
     FQs += args.fastq.split(",")
 
-UniqSpecies_flag = True
 
-if len(DBs) > 1:
-    # There are several species:
-    UniqSpecies_flag = False
-elif len(DBs) == 1:
-    if not re.search(":", DBs[0]):
-        DBs[0] += ":SP"
 
 # Get species names and check if a database exist
 for item in DBs:
