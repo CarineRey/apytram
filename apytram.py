@@ -88,7 +88,7 @@ parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 requiredOptions = parser.add_argument_group('Required arguments')
 requiredOptions.add_argument('-d', '--database', type=str,
                              help='Database prefix name. If a database with the same name already exists, the existing database will be kept and the database will NOT be rebuilt.', required=True)
-requiredOptions.add_argument('-dt', '--database_type', type=str, choices=["single", "paired", "FR", "RF", "F", "R"],
+requiredOptions.add_argument('-dt', '--database_type', type=str,
                              help="""
                                   single: single unstranded data ______________________
                                   paired: paired unstranded data ______________________
@@ -108,7 +108,7 @@ InUSOptions = parser.add_argument_group('Input Files')
 InUSOptions.add_argument('-fa', '--fasta', type=str,
                    help="Fasta formated RNA-seq data to build the database of reads (only one file).")
 InUSOptions.add_argument('-fq', '--fastq', type=str,
-                   help="Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
+                   help="Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). For paired data, fq must be previously concatenated. WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
 ##############
 
 ##############
@@ -227,6 +227,9 @@ MiscellaneousOptions.add_argument('-time_max', type=positive_integer,
 MiscellaneousOptions.add_argument('--write_even_empty', action='store_true',
                         default=False,
                         help="Write output fasta files, even if they must be empty. (Default: False)")
+MiscellaneousOptions.add_argument('--out_by_species', action='store_true',
+                        default=False,
+                        help="Write output fasta files for each species. (Default: False)")
 MiscellaneousOptions.add_argument('--debug', action='store_true', default=False,
                    help="debug mode, default False")
 ##############
@@ -323,21 +326,14 @@ Memory = args.memory
 MaxTime = args.time_max
 
 
-if args.database_type in ["RF", "FR", "R", "F"]:
-    StrandedData = True
-else:
-    StrandedData = False
-
-if args.database_type in ["paired", "RF", "FR"]:
-    PairedData = True
-else:
-    PairedData = False
-
 if args.plot:
     args.stats = True
 
 # Define query files
-Queries = args.query.split(",")
+if args.query:
+    Queries = args.query.split(",")
+else:
+    Queries = []
 
 logger.warning("Query:")
 
@@ -359,7 +355,7 @@ for query in Queries:
         if not name:
             name = os.path.basename(os.path.splitext(query)[0])
         new_query = ApytramClasses.Query(name, query, logger)
-        new_query.TmpDirName = "%s/%s" %(TmpDirName, name)
+        new_query.TmpDirName = "%s/%s" %(TmptrinityDirName, name)
         QueriesList.append(new_query)
         QueriesNamesList.append(name)
     else:
@@ -368,7 +364,7 @@ for query in Queries:
         new_query = ApytramClasses.Query(name, query, logger)
         new_query.TmpDirName = "%s/%s/" %(TmpDirName, name)
         ApytramNeeds.set_directory_from_prefix(new_query.TmpDirName, "temporary", logger)
-        logger.warning("\t-%s ... ok (%s sequences)", new_query.RawQuery, new_query.SequenceNb)
+        logger.warning("\t-%s %s ... ok (%s sequences)", name, new_query.RawQuery, new_query.SequenceNb)
         if not name in QueriesNamesList:
             new_query.AlignedQuery = new_query.RawQuery
             if new_query.SequenceNb != 1:
@@ -412,14 +408,6 @@ SpeciesList = []
 SpeciesNamesList = []
 
 DBs = args.database.split(",")
-
-FAs = []
-FQs = []
-if args.fasta:
-    FAs += args.fasta.split(",")
-if args.fastq:
-    FQs += args.fastq.split(",")
-
 UniqSpecies_flag = True
 
 if len(DBs) > 1:
@@ -429,12 +417,30 @@ elif len(DBs) == 1:
     if not re.search(":", DBs[0]):
         DBs[0] += ":SP"
 
+DB_types_dict = {}
+for item in args.database_type.split(","):
+    db_type_sp = item.split(":")
+    logger.debug(db_type_sp)
+    if len(db_type_sp) == 2:
+        db_type = db_type_sp[1]
+        DB_types_dict[db_type] = db_type_sp[0]
+    elif len(db_type_sp) == 1 and len(DBs) == 1:
+        sp = DBs[0].split(":")[1]
+        DB_types_dict[sp] = db_type_sp[0]
+
+
+FAs = []
+FQs = []
+if args.fasta:
+    FAs += args.fasta.split(",")
+if args.fastq:
+    FQs += args.fastq.split(",")
+
+
+
 # Get species names and check if a database exist
 for item in DBs:
     new_species = ApytramClasses.RNA_species(start_time, logger)
-    new_species.DatabaseType = args.database_type
-    new_species.StrandedData = StrandedData
-    new_species.PairedData = PairedData
     new_species.Evalue = Evalue
     new_species.MinLength = MinLength
     new_species.MinIdentityPercentage = MinIdentityPercentage
@@ -448,6 +454,24 @@ for item in DBs:
 
     if len(s) == 2:
         (new_species.DatabaseName, new_species.Species) = s
+        new_species.DatabaseType = DB_types_dict.get(new_species.Species ,"")
+        # Check db_type
+        if new_species.DatabaseType in ["single", "paired", "FR", "RF", "F", "R"]:
+            if new_species.DatabaseType in ["RF", "FR", "R", "F"]:
+                 new_species.StrandedData = True
+            else:
+                 new_species.StrandedData = False
+
+            if new_species.DatabaseType in ["paired", "RF", "FR"]:
+                new_species.PairedData = True
+            else:
+                new_species.PairedData = False
+        else:
+             logger.error("""The species "%s" must have data type in ["single", "paired", "FR", "RF", "F", "R"] and not %s""",
+                        new_species.Species,
+                        new_species.DatabaseType
+                        )
+
         if not new_species.Species in SpeciesList:
             new_species.FormatedDatabase = new_species.has_a_formated_database()
             SpeciesList.append(new_species)
@@ -500,8 +524,11 @@ for item in FQs:
 
 logger.warning("Species:")
 for Species in SpeciesList:
-    if Species.FormatedDatabase:
-        logger.warning("\t-%s ... Formated database", Species.Species)
+    if not Species.DatabaseType in ["single", "paired", "FR", "RF", "F", "R"]:
+        logger.warning("\t-%s ... Unknown data type (%s) -> ERROR", Species.Species, Species.DatabaseType)
+        error += 1
+    elif Species.FormatedDatabase:
+        logger.warning("\t-%s ... Formated database (%s)", Species.Species, Species.DatabaseType)
     elif Species.Fasta and Species.Fastq:
         logger.warning("\t-%s ... NO formated database. fasta AND fastq input files -> ERROR", Species.Species)
         error += 1
@@ -559,7 +586,7 @@ else:
 
 
 for Query in QueriesList:
-    logger.info("NEW QUERY: %s", Query.Name)
+    logger.warning("NEW QUERY: %s", Query.Name)
 
     Query.OutPrefixName = "%s.%s" %(OutPrefixName, Query.Name)
     Query.NbSpecies = len(SpeciesNamesList)
@@ -572,7 +599,7 @@ for Query in QueriesList:
     while (Query.AbsIteration < MaxIteration) and (Query.continue_iter()) and Query.SequenceNb:
         Query.AbsIteration += 1
         Query.SpeciesWithoutImprovment[Query.AbsIteration] = []
-        logger.info("Iteration %d/%d", Query.AbsIteration, MaxIteration)
+        logger.warning("\tIteration %d/%d", Query.AbsIteration, MaxIteration)
 
         for Species in SpeciesList:
             if not Species.Finished:
@@ -581,7 +608,7 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 Species.new_iteration()
-                logger.info("Start iteration %d/%d for %s", Species.CurrentIteration, MaxIteration, Species.Species)
+                logger.warning("\t\t Start iteration %d/%d for %s", Species.CurrentIteration, MaxIteration, Species.Species)
 
                 ### Blast bait sequences on database of reads
                 # Write read names in ReadNamesFile if the file does not exist
@@ -747,9 +774,20 @@ for Query in QueriesList:
                 Species.rename_sequences()
                 # Prepare fasta output files by species
                 if not args.no_best_file:
-                    Query.BestOutFileContent.extend(Species.get_output_fasta(fasta="best"))
+                    QuerySpeciesBestFastaOutput = Species.get_output_fasta(fasta="best")
+                    Query.BestOutFileContent.extend(QuerySpeciesBestFastaOutput)
+                    if args.out_by_species:
+                        QuerySpeciesBestFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".best.fasta"
+                        if QuerySpeciesBestFastaOutput or args.write_even_empty:
+                            ApytramNeeds.write_in_file("".join(QuerySpeciesBestFastaOutput), QuerySpeciesBestFinalFastaFileName)
+
                 if not args.only_best_file:
-                    Query.OutFileContent.extend(Species.get_output_fasta(fasta="all"))
+                    QuerySpeciesFastaOutput = Species.get_output_fasta(fasta="all")
+                    Query.OutFileContent.extend(QuerySpeciesFastaOutput)
+                    if args.out_by_species:
+                        QuerySpeciesFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".fasta"
+                        if QuerySpeciesFastaOutput or args.write_even_empty:
+                            ApytramNeeds.write_in_file("".join(QuerySpeciesFastaOutput), QuerySpeciesFinalFastaFileName)
 
                 if args.plot_ali or args.stats:
                     ### Calculate the coverage
@@ -803,6 +841,7 @@ for Query in QueriesList:
     logger.debug("Writing outputs --- %s seconds ---", str(time.time() - start_output))
 
 
-logger.info("--- %s seconds ---", str(time.time() - start_time))
-logger.warning("END")
+end_time = str(time.time() - start_time)
+logger.info("--- %s seconds ---", end_time )
+logger.warning("END (%s seconds)", end_time)
 ApytramNeeds.end(0, TmpDirName, keep_tmp=args.keep_tmp)

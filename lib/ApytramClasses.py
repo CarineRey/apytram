@@ -204,7 +204,7 @@ class RNA_species:
                 os.makedirs(OutDirName)
         self.OutDirPrefix = OutPrefixName
 
-    def build_database(self,FreeSpaceTmpDir,TmpDirName):
+    def build_database(self, FreeSpaceTmpDir, TmpDirName):
         start = time.time()
         self.logger.info("Database %s does not exist for the species: %s" % (self.DatabaseName, self.Species))
         self.DatabaseDirName = os.path.dirname(self.DatabaseName)
@@ -239,7 +239,7 @@ class RNA_species:
             (out,err) = ApytramNeeds.fastq2fasta(" ".join(self.Fastq),self.InputFastaFilename)
             if err:
                 self.logger.error(err)
-                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+                ApytramNeeds.end(1, self.TmpDirName, keep_tmp=self.keep_tmp)
             self.logger.info("Convertion takes %s seconds" %(time.time() - start_convert))
         elif self.Fasta:
             for fasta in self.Fasta:
@@ -270,6 +270,7 @@ class RNA_species:
 
         #Check if the end of sequence name of paired data are 1 or 2
         if self.PairedData:
+            self.logger.debug("Fasta file: %s",self.InputFastaFilename)
             BadReadName = ApytramNeeds.check_paired_data(self.InputFastaFilename)
             if BadReadName:
                 self.logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %(BadReadName))
@@ -339,11 +340,11 @@ class RNA_species:
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast", start = start)
-        self.logger.debug("Blast --- %s seconds ---" %(self.get_time_statistic("Blast")))
+        self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
 
     def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
         start = time.time()
-        if self.DatabaseType in ["RF","FR"]:
+        if self.PairedData:
             self.logger.info("Split read names depending on 1/ or 2/")
             (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ReadNamesFilename,self.ReadNamesFilename_Right,self.ReadNamesFilename_Left)
             if err:
@@ -370,18 +371,14 @@ class RNA_species:
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
-        if self.StrandedData:
-            if self.DatabaseType in ["RF","FR"]:
-                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, right = self.ReadFastaFilename_Right,
-                                                left = self.ReadFastaFilename_Left)
-            else:
-                TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
-
-            TrinityProcess.SS_lib_type = self.DatabaseType
+        if self.PairedData:
+            TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename,
+                                             right = self.ReadFastaFilename_Right,
+                                             left = self.ReadFastaFilename_Left)
         else:
             TrinityProcess = Trinity.Trinity(self.TrinityFastaFilename, single = self.ReadFastaFilename)
-            if self.PairedData:
-                TrinityProcess.RunAsPaired = True
+        if self.StrandedData:
+            TrinityProcess.SS_lib_type = self.DatabaseType
         # If there is a huge number of reads, remove duplicated reads
         if self.ReadsNumber > 1000:
             TrinityProcess.NormalizeReads = True
@@ -409,7 +406,7 @@ class RNA_species:
                self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
 
         self.add_time_statistic("Trinity", start = start)
-        self.logger.debug("Trinity --- %s seconds ---" %(self.get_time_statistic("Trinity")))
+        self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))
 
     def get_homology_between_trinity_results_and_references(self,Query):
         # Use Exonerate
