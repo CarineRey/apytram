@@ -256,14 +256,14 @@ class RNA_species:
             if len(self.Fasta) > 1:
                 if input_size*1.1 > FreeSpaceTmpDir:
                     self.logger.error("Not enough available free space in %s to concatenate input files" %TmpDirName)
-                    end(1,TmpDirName)
+                    ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
                 self.InputFastaFilename = "%s/input_fasta.fasta" %(self.TmpDirName)
                 self.logger.info("Concatenate fasta files")
                 start_convert = time.time()
                 (out,err) = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFastaFilename)
                 if err:
                     self.logger.error(err)
-                    end(1,TmpDirName)
+                    ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
                 self.logger.info("Concatenation takes %s seconds" %(time.time() - start_convert))
             else:
                 self.InputFastaFilename = self.Fasta[0]
@@ -274,11 +274,11 @@ class RNA_species:
             BadReadName = ApytramNeeds.check_paired_data(self.InputFastaFilename)
             if BadReadName:
                 self.logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %(BadReadName))
-                end(1,TmpDirName)
+                ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         #Build blast formated database from a fasta file
         if not os.path.isfile(self.InputFastaFilename):
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
-            end(1,TmpDirName)
+            ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
 
         # Database building
         self.logger.info(self.DatabaseName + " database building")
@@ -290,7 +290,7 @@ class RNA_species:
         if not self.FormatedDatabase:
             self.logger.error("Problem in the database building.\nAre you sure of your input format?\nAre all read names unique?")
             self.logger.info("Database %s does not exist" % self.DatabaseName)
-            end(1,TmpDirName)
+            ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         else:
             self.add_time_statistic("DatabaseBuilding", start = start)
             self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
@@ -752,11 +752,11 @@ class Query:
             # if args.query_pep:
             #   if not os.path.isfile(args.query_pep):
             #        logger.error(args.query_pep+" (-pep) is not a file.")
-            #        end(1,TmpDirName)
+            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
             #
             #    if not args.query:
             #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
-            #        end(1,TmpDirName)
+            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
 
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
