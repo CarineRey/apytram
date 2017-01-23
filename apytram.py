@@ -172,8 +172,8 @@ OutOptions.add_argument('--plot_ali', action='store_true',
 ##############
 SearchOptions = parser.add_argument_group('Thresholds for EACH ITERATION')
 SearchOptions.add_argument('-e', '--evalue', type=positive_float,
-                    help="Evalue threshold of the blastn of the bait queries on the database of reads. (Default 1e-3)",
-                    default=1e-3)
+                    help="Evalue threshold of the blastn of the bait queries on the database of reads. (Default 1e-5)",
+                    default=1e-5)
 
 SearchOptions.add_argument('-id', '--min_id', type=positive_integer,
                     help="Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 50)",
