@@ -380,8 +380,8 @@ class RNA_species:
         if self.StrandedData:
             TrinityProcess.SS_lib_type = self.DatabaseType
         # If there is a huge number of reads, remove duplicated reads
-        if self.ReadsNumber > 1000:
-            TrinityProcess.NormalizeReads = True
+        if self.ReadsNumber < 500:
+            TrinityProcess.NoNormalizeReads = True
 
         TrinityProcess.CPU = Threads
         TrinityProcess.max_memory = Memory
@@ -401,9 +401,13 @@ class RNA_species:
             if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(self.CurrentIteration,ExitCode) )
+            elif ExitCode == 255:
+               self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
+               self.logger.error("Trinity has crashed (ExitCode: %d). Do you use the last version of Trinity (>= 2.3)?" %(ExitCode))
             elif ExitCode != 0:
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
                self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
+
 
         self.add_time_statistic("Trinity", start = start)
         self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))

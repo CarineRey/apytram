@@ -52,7 +52,7 @@ class Trinity(object):
         self.RunAsPaired = False
         self.FullCleanup = False
         self.NoPathMerging = False
-        self.NormalizeReads = False
+        self.NoNormalizeReads = False
         self.SS_lib_type = ""
 
     def launch(self):
@@ -83,8 +83,8 @@ class Trinity(object):
         if self.NoPathMerging:
             command.append("--no_path_merging")
 
-        if self.NormalizeReads:
-            command.append("--normalize_reads")
+        if self.NoNormalizeReads:
+            command.append("--no_normalize_reads")
 
         if self.SS_lib_type in ["FR", "RF", "F", "R"]:
             command.extend(["--SS_lib_type", self.SS_lib_type])
