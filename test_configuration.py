@@ -109,10 +109,10 @@ class TestConfigApytram(unittest.TestCase):
 		#	print "        !! Check samtools version = 0.1.19"
                 self.assertIsNotNone(Search)
 
-	#Check Bowtie:
-        def test_bowtie(self):
-                #print "\nSearch for bowtie"
-                Search = search("bowtie")
+	#Check Bowtie2:
+        def test_bowtie2(self):
+                #print "\nSearch for bowtie2"
+                Search = search("bowtie2")
                 #print Search
                 self.assertIsNotNone(Search)
 
