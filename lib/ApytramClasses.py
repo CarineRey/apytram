@@ -798,7 +798,3 @@ class Query:
         (StrictCoverage, LargeCoverage, self.DicPlotCov) = ApytramNeeds.calculate_coverage(self.MafftResult,self.ReferenceNames)
 
         self.logger.info("Strict Coverage: %s\tLarge Coverage: %s" %(StrictCoverage, LargeCoverage))
-
-
-
-

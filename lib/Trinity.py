@@ -35,7 +35,19 @@
 
 import logging
 import subprocess
+import re
 
+def get_version():
+    command = ["Trinity", "--version"]
+    p = subprocess.Popen(command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+    (out, err) = p.communicate()
+    if not err:
+        version = out.split("\n")[0]
+    else:
+        version = ""
+    return(version)
 
 class Trinity(object):
     """Define an object to launch Trinity"""
@@ -84,7 +96,12 @@ class Trinity(object):
             command.append("--no_path_merging")
 
         if self.NoNormalizeReads:
-            command.append("--no_normalize_reads")
+            Trinity_version = get_version()
+            if re.search( "v2.3", Trinity_version):
+                command.append("--no_normalize_reads")
+            else:
+                self.logger.warning("No last version of Trinity")
+
 
         if self.SS_lib_type in ["FR", "RF", "F", "R"]:
             command.extend(["--SS_lib_type", self.SS_lib_type])
