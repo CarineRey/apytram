@@ -746,38 +746,37 @@ for Query in QueriesList:
                 # Keep only sequence with a identity percentage > FinalMinIdentitypercentage on the whole hit
                 # and write filtered sequences in a file
                 Species.filter_trinity_results_according_homology_results(final_iteration=True)
+        else:
+            logger.warn("No results for %s", Species.Species)
 
-            start_output = time.time()
-            if Species.FilteredTrinityFasta.Sequences: # If sequences pass the last filter
-                Species.rename_sequences()
-                # Prepare fasta output files by species
-                if not args.no_best_file:
-                    QuerySpeciesBestFastaOutput = Species.get_output_fasta(fasta="best")
-                    Query.BestOutFileContent.extend(QuerySpeciesBestFastaOutput)
-                    if args.out_by_species:
-                        QuerySpeciesBestFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".best.fasta"
-                        if QuerySpeciesBestFastaOutput or args.write_even_empty:
-                            ApytramNeeds.write_in_file("".join(QuerySpeciesBestFastaOutput), QuerySpeciesBestFinalFastaFileName)
+        if Species.FilteredTrinityFasta.Sequences or args.write_even_empty: # If sequences pass the last filter
+            Species.rename_sequences()
+            logger.debug("output: %s", Species.Species)
+            # Prepare fasta output files by species
+            if not args.no_best_file:
+                QuerySpeciesBestFastaOutput = Species.get_output_fasta(fasta="best")
+                Query.BestOutFileContent.extend(QuerySpeciesBestFastaOutput)
+                if args.out_by_species:
+                    QuerySpeciesBestFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".best.fasta"
+                    if QuerySpeciesBestFastaOutput or args.write_even_empty:
+                         ApytramNeeds.write_in_file("".join(QuerySpeciesBestFastaOutput), QuerySpeciesBestFinalFastaFileName)
 
-                if not args.only_best_file:
-                    QuerySpeciesFastaOutput = Species.get_output_fasta(fasta="all")
-                    Query.OutFileContent.extend(QuerySpeciesFastaOutput)
-                    if args.out_by_species:
-                        QuerySpeciesFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".fasta"
-                        if QuerySpeciesFastaOutput or args.write_even_empty:
-                            ApytramNeeds.write_in_file("".join(QuerySpeciesFastaOutput), QuerySpeciesFinalFastaFileName)
+            if not args.only_best_file:
+                QuerySpeciesFastaOutput = Species.get_output_fasta(fasta="all")
+                Query.OutFileContent.extend(QuerySpeciesFastaOutput)
+                if args.out_by_species:
+                    QuerySpeciesFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".fasta"
+                    if QuerySpeciesFastaOutput or args.write_even_empty:
+                        ApytramNeeds.write_in_file("".join(QuerySpeciesFastaOutput), QuerySpeciesFinalFastaFileName)
 
-                if args.plot_ali or args.stats:
-                    ### Calculate the coverage
-                    logger.info("Calculate the final coverage")
-                    Species.measure_coverage(Query)
+            if args.plot_ali or args.stats:
+                 ### Calculate the coverage
+                 logger.info("Calculate the final coverage")
+                 Species.measure_coverage(Query)
 
             Species.end_iteration()
 
             # Stats files
-
-        else:
-            logger.warn("No results for %s", Species.Species)
 
         if args.stats:
             logger.info("Write statistics file (OutPrefix.stats.csv)")
