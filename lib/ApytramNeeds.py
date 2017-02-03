@@ -416,7 +416,7 @@ def number_new_reads(FileOld, FileNew, nb_intial=0):
         p1.wait()
 
         if out:
-           Nb = out
+           Nb = int(out)
         else:
             print err
     elif nb_intial:
