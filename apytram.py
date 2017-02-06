@@ -616,8 +616,10 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
-                Identical = ApytramNeeds.are_identical(Species.ReadNamesFilename, Species.PreviousReadNamesFilename)
-                if Identical and not FinishAllIter:
+                NbNewReads = ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ReadNamesFilename, nb_intial=Species.ReadsNumber)
+                logger.warning("Iteration: %s - Species: %s - Number of new reads: %s", Species.CurrentIteration, Species.Species, NbNewReads)
+
+                if (NbNewReads == 0) and not FinishAllIter:
                     logger.info("Reads from the current iteration are identical to reads from the previous iteration")
                     Species.Improvment = False
                     Species.CompletedIteration = False

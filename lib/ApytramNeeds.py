@@ -390,7 +390,7 @@ def check_paired_data(FastaFile):
                 BadReadName = ReadName[1:]
     return BadReadName
 
-def are_identical(File1,File2):
+def are_identical(File1, File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):
         diff = subprocess.call(["diff",File1,File2,"--brief"],
@@ -399,6 +399,29 @@ def are_identical(File1,File2):
         if not diff:
             Identical = True
     return Identical
+    
+def number_new_reads(FileOld, FileNew, nb_intial=0):
+    Nb = 0
+    if os.path.isfile(FileNew) and  os.path.isfile(FileOld):
+        command1 = "join -v 2 %s %s" %(FileOld, FileNew)
+        command2 = "wc -l"
+        p1 = subprocess.Popen(command1.split(),
+                             stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(command2.split(),
+                             stdin=p1.stdout,
+                             stdout=subprocess.PIPE)
+        # Allow process_curl to receive a SIGPIPE if process_wc exits.
+        p1.stdout.close()
+        (out, err) = p2.communicate()
+        p1.wait()
+
+        if out:
+           Nb = int(out)
+        else:
+            print err
+    elif nb_intial:
+        Nb = nb_intial
+    return Nb
 
 
 def check_almost_identical_exonerate_results(ExonerateResult):
