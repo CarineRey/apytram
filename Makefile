@@ -1,8 +1,8 @@
 test:
-	test_configuration.py && cd example && bash Launch_apytram.sh
+	test_apytram_configuration.py && cd example && bash Launch_apytram.sh
 
 test2:
-	test_configuration.py && cd example && bash Launch_apytram2.sh
+	test_apytram_configuration.py && cd example && bash Launch_apytram2.sh
 
 clean_test:
 	cd example && rm -r working_dir/ output_dir/
