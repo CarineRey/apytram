@@ -31,10 +31,10 @@ RUN wget ftp://ftp.ncbi.nih.gov/blast/executables/blast+/2.6.0/ncbi-blast-2.6.0+
 ENV PATH /opt/ncbi-blast-2.6.0+/bin/:$PATH
 
 
-### install openjdk-8-jdk
+### install openjdk-8-jre
 RUN echo "deb http://http.debian.net/debian jessie-backports main" >> /etc/apt/sources.list
 RUN apt-get update
-RUN apt-get install -qy openjdk-8-jdk
+RUN apt-get install -qy openjdk-8-jre
 #update-java-alternatives --set java-1.8.0-openjdk-amd64
 
 
