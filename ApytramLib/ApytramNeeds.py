@@ -249,7 +249,6 @@ def fastq2fasta(FastqFiles,FastaFile):
     command1 = """cat %s """ %(FastqFiles)
     command2 = ["awk", """NR%4==1||NR%4==2"""]
     command3 = ["tr", "@", ">"]
-    print command2
     with open(FastaFile, 'w') as OutFile:
         p1 = subprocess.Popen(command1.split(), stdout=subprocess.PIPE)
         p2 = subprocess.Popen(command2, stdin=p1.stdout, stdout=subprocess.PIPE)
@@ -395,7 +394,7 @@ def check_paired_data(FastaFile):
 
         #Exit = subprocess.check_output(["grep", "^>",FastaFile, "-m", "100"])
         #Exit2 = subprocess.check_output(["tac %s | grep -m 100 \"^>\"" %FastaFile], shell=True)
-        ReadNames = (out1+out22).strip().split("\n")
+        ReadNames = (out1+out2).strip().split("\n")
         while (not BadReadName) and ReadNames:
             ReadName = ReadNames.pop()
             if not re.search("[12]$",ReadName):
@@ -405,9 +404,10 @@ def check_paired_data(FastaFile):
 def are_identical(File1, File2):
     Identical = False
     if os.path.isfile(File1) and  os.path.isfile(File2):
-        diff = subprocess.call(["diff",File1,File2,"--brief"],
-                                       stdout=open("/dev/null", "w"),
-                                       stderr=open("/dev/null", "w"))
+        with open(os.devnull, 'w')  as FNULL:
+            diff = subprocess.call(["diff",File1,File2,"--brief"],
+                                       stdout=FNULL,
+                                       stderr=FNULL)
         if not diff:
             Identical = True
     return Identical
