@@ -37,10 +37,7 @@ import unittest
 import os
 import sys
 
-from lib import ApytramNeeds
-from lib import BlastPlus
-from lib import Trinity
-from lib import Aligner
+import ApytramLib
 
 def search(program):
     def is_exe(fpath):

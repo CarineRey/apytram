@@ -43,10 +43,7 @@ import subprocess
 import time
 
 
-from lib import BlastPlus
-from lib import Trinity
-from lib import Aligner
-from lib import ApytramNeeds
+import ApytramLib
 
 
 import pandas
@@ -54,10 +51,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-
-
-
-
 
 #### Execution statistics class
 class Exec_stats:

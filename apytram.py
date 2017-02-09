@@ -43,9 +43,7 @@ import tempfile
 import logging
 import argparse
 
-from lib import ApytramClasses
-from lib import ApytramNeeds
-from lib import Aligner
+import ApytramLib
 
 
 def strict_positive_integer(x):
