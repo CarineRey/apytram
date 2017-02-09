@@ -280,9 +280,8 @@ def complement(Sequence_str):
 
 def write_in_file(String,Filename,mode = "w"):
     if mode in ["w","a"]:
-        File = open(Filename,mode)
-        File.write(String)
-        File.close()
+        with open(Filename,mode) as File:
+            File.write(String)
 
 def add_paired_read_names(File, logger = ""):
     "Add paired read name to a read name list"
