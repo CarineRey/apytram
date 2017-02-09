@@ -43,8 +43,10 @@ import subprocess
 import time
 
 
-import ApytramLib
-
+import ApytramNeeds
+import Aligner
+import BlastPlus
+import Trinity
 
 import pandas
 import matplotlib

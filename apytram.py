@@ -352,16 +352,16 @@ for query in Queries:
         empty_queries += 1
         if not name:
             name = os.path.basename(os.path.splitext(query)[0])
-        new_query = ApytramClasses.Query(name, query, logger)
+        new_query = ApytramLib.ApytramClasses.Query(name, query, logger)
         new_query.TmpDirName = "%s/%s" %(TmptrinityDirName, name)
         QueriesList.append(new_query)
         QueriesNamesList.append(name)
     else:
         if not name:
             name = os.path.basename(os.path.splitext(query)[0])
-        new_query = ApytramClasses.Query(name, query, logger)
+        new_query = ApytramLib.ApytramClasses.Query(name, query, logger)
         new_query.TmpDirName = "%s/%s/" %(TmpDirName, name)
-        ApytramNeeds.set_directory_from_prefix(new_query.TmpDirName, "temporary", logger)
+        ApytramLib.ApytramNeeds.set_directory_from_prefix(new_query.TmpDirName, "temporary", logger)
         logger.warning("\t-%s %s ... ok (%s sequences)", name, new_query.RawQuery, new_query.SequenceNb)
         if not name in QueriesNamesList:
             new_query.initialization()
@@ -416,7 +416,7 @@ if args.fastq:
 
 # Get species names and check if a database exist
 for item in DBs:
-    new_species = ApytramClasses.RNA_species(start_time, logger)
+    new_species = ApytramLib.ApytramClasses.RNA_species(start_time, logger)
     new_species.Evalue = Evalue
     new_species.MinLength = MinLength
     new_species.MinIdentityPercentage = MinIdentityPercentage
@@ -472,7 +472,7 @@ for item in FAs:
             SpeciesList[SpeciesNamesList.index(species)].Fasta.append(fa)
         else:
             logger.error("%s (-fa) is not a file.", fa)
-            ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
     else:
         logger.error(""" "%s" must be formatted as "fa_path:species" if you want to use the multispecies option" """, item)
 
@@ -488,10 +488,10 @@ for item in FQs:
                 SpeciesList[SpeciesNamesList.index(species)].Fastq.append(fq)
             else:
                 logger.error("The species associted with %s is %s. But there is no database associated with the species %s.", fq, species, species)
-                ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+                ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
         else:
             logger.error("%s (-fq) is not a file.", fq)
-            ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
     else:
         logger.error(""" "%s" must be formatted as "fq_path:species" if you want to use the multispecies option" """, item)
 
@@ -521,16 +521,16 @@ if error > 0:
         logger.warning("Some query files are empty, but you use --write_even_empty option -> empty file will be create")
     else:
         logger.error("Error(s) occured, see above")
-        ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 ### If iteration begin not from 1, the temporary directory must be given by the user
 if StartIteration != 1 and not args.tmp:
     logger.error("If you want to restart a previous job, the previous temporary directory must be given.")
-    ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 
 ### Get the available free space of the tmp dir
-FreeSpaceTmpDir = ApytramNeeds.get_free_space(TmpDirName)
+FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
 
@@ -543,9 +543,9 @@ for Species in SpeciesList:
 ### If there is a query continue, else stop
 if not args.query:
     logger.info("There is no query (-q), apytram has finished.")
-    ApytramNeeds.end(0, TmpDirName, keep_tmp=args.keep_tmp)
+    ApytramLib.ApytramNeeds.end(0, TmpDirName, keep_tmp=args.keep_tmp)
 else:
-    ApytramNeeds.set_directory_from_prefix(args.output_prefix, "output", logger)
+    ApytramLib.ApytramNeeds.set_directory_from_prefix(args.output_prefix, "output", logger)
 
 ### Set up the output directory
 if args.output_prefix:
@@ -558,7 +558,7 @@ if args.output_prefix:
         os.makedirs(os.path.dirname(args.output_prefix))
 else:
     logger.error("The output prefix must be defined")
-    ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 
 for Query in QueriesList:
@@ -596,15 +596,15 @@ for Query in QueriesList:
                 if Species.PairedData:
                     # Get paired reads names and remove duplicated names
                     logger.info("Get paired reads names and remove duplicated names")
-                    ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, logger)
+                    ApytramLib.ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, logger)
                 else:
                     # Remove duplicated names
                     logger.info("Remove duplicated names")
-                    ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, logger)
+                    ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, logger)
 
                 # Count the number of reads which will be used in the Trinity assembly
                 logger.info("Count the number of reads")
-                Species.ReadsNumber = ApytramNeeds.count_lines(Species.ReadNamesFilename)
+                Species.ReadsNumber = ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename)
                 Species.add_iter_statistic("ReadsNumber", Species.ReadsNumber)
 
                 if not Species.ReadsNumber:
@@ -614,7 +614,7 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
-                NbNewReads = ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ReadNamesFilename, nb_intial=Species.ReadsNumber)
+                NbNewReads = ApytramLib.ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ReadNamesFilename, nb_intial=Species.ReadsNumber)
                 logger.warning("Iteration: %s - Species: %s - Number of new reads: %s", Species.CurrentIteration, Species.Species, NbNewReads)
 
                 if (NbNewReads == 0) and not FinishAllIter:
@@ -699,19 +699,19 @@ for Query in QueriesList:
                             #if KeepIterations:
                             #    if not args.no_best_file:
                             #    # Best sequences of the iteration
-                            #        ExitCode = ApytramNeeds.write_apytram_output(FilteredTrinityFasta, TrinityExonerateResultsDict,
+                            #        ExitCode = ApytramLib.ApytramNeeds.write_apytram_output(FilteredTrinityFasta, TrinityExonerateResultsDict,
                             #                                        "%s.iter_%d.best.fasta" %(OutPrefixName,i),
                             #                                        Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                             #                                        Names = BestScoreNames.values(),
                             #                                        Message = "iter_%d.best." %i)
                             #    # All sequences of the iteration
-                            #    ExitCode = ApytramNeeds.write_apytram_output(FilteredTrinityFasta,
+                            #    ExitCode = ApytramLib.ApytramNeeds.write_apytram_output(FilteredTrinityFasta,
                             #                                    TrinityExonerateResultsDict,
                             #                                    "%s.iter_%d.fasta" %(OutPrefixName,i),
                             #                                    Header = TrinityExonerateProcess.Ryo.replace('%',"").replace("\n","").split(),
                             #                                    Message = "iter_%d." %i)
                             #    # Mafft alignment
-                            #    ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
+                            #    ApytramLib.ApytramNeeds.write_in_file(MafftResult,"%s.iter_%s.ali.fasta" %(OutPrefixName,i))
 
 
             # End iteration
@@ -759,7 +759,7 @@ for Query in QueriesList:
                 if args.out_by_species:
                     QuerySpeciesBestFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".best.fasta"
                     if QuerySpeciesBestFastaOutput or args.write_even_empty:
-                         ApytramNeeds.write_in_file("".join(QuerySpeciesBestFastaOutput), QuerySpeciesBestFinalFastaFileName)
+                         ApytramLib.ApytramNeeds.write_in_file("".join(QuerySpeciesBestFastaOutput), QuerySpeciesBestFinalFastaFileName)
 
             if not args.only_best_file:
                 QuerySpeciesFastaOutput = Species.get_output_fasta(fasta="all")
@@ -767,7 +767,7 @@ for Query in QueriesList:
                 if args.out_by_species:
                     QuerySpeciesFinalFastaFileName = Query.OutPrefixName + "." + Species.Species + ".fasta"
                     if QuerySpeciesFastaOutput or args.write_even_empty:
-                        ApytramNeeds.write_in_file("".join(QuerySpeciesFastaOutput), QuerySpeciesFinalFastaFileName)
+                        ApytramLib.ApytramNeeds.write_in_file("".join(QuerySpeciesFastaOutput), QuerySpeciesFinalFastaFileName)
 
             if args.plot_ali or args.stats:
                  ### Calculate the coverage
@@ -788,16 +788,16 @@ for Query in QueriesList:
     if Query.BestOutFileContent or args.write_even_empty:
         if not args.no_best_file:
             Query.FinalFastaFileName = Query.OutPrefixName + ".best.fasta"
-            ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.FinalFastaFileName)
+            ApytramLib.ApytramNeeds.write_in_file("".join(Query.BestOutFileContent), Query.FinalFastaFileName)
     if Query.OutFileContent or args.write_even_empty:
         if not args.only_best_file:
             Query.FinalFastaFileName = Query.OutPrefixName + ".fasta"
-            ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.FinalFastaFileName)
+            ApytramLib.ApytramNeeds.write_in_file("".join(Query.OutFileContent), Query.FinalFastaFileName)
     if Query.StatsFileContent:
-        ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
+        ApytramLib.ApytramNeeds.write_stats(Query.StatsFileContent, Query.OutPrefixName + ".stats.csv")
         if args.plot:
             logger.info("Create plot from the statistics file (OutPrefix.stats.pdf)")
-            ApytramNeeds.create_plot(Query.TimeStatsDictList,
+            ApytramLib.ApytramNeeds.create_plot(Query.TimeStatsDictList,
                                      Query.IterStatsDictList,
                                      SpeciesNamesList,
                                      Query.OutPrefixName)
@@ -808,11 +808,11 @@ for Query in QueriesList:
         LengthAlignment = len(Species.DicPlotCov[Species.DicPlotCov.keys()[0]])
         if LengthAlignment <= 3100:
             logger.info("Create plot of the final alignment (OutPrefix.ali.png)")
-            ApytramNeeds.create_plot_ali(Query.DicPlotCov, Query.OutPrefixName)
+            ApytramLib.ApytramNeeds.create_plot_ali(Query.DicPlotCov, Query.OutPrefixName)
         else:
             logger.warn("Final alignment is longger than 3100 pb, the plot of the final alignment (OutPrefix.ali.png) can NOT be created. See the final alignement (OutPrefix.ali.fasta).")
         logger.info("Write the final alignment in OutPrefix.ali.fasta")
-        ApytramNeeds.write_in_file(Query.MafftResult, "%s.ali.fasta" %(Query.OutPrefixName))
+        ApytramLib.ApytramNeeds.write_in_file(Query.MafftResult, "%s.ali.fasta" %(Query.OutPrefixName))
         logger.debug("Writing alignment plot and fasta --- %s seconds ---", str(time.time() - start_output_ali))
 
     logger.debug("Writing outputs --- %s seconds ---", str(time.time() - start_output))
@@ -821,4 +821,4 @@ for Query in QueriesList:
 end_time = str(time.time() - start_time)
 logger.info("--- %s seconds ---", end_time )
 logger.warning("END (%s seconds)", end_time)
-ApytramNeeds.end(0, TmpDirName, keep_tmp=args.keep_tmp)
+ApytramLib.ApytramNeeds.end(0, TmpDirName, keep_tmp=args.keep_tmp)
