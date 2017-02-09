@@ -35,6 +35,7 @@
 
 import unittest
 import os
+import re
 import sys
 
 import ApytramLib
@@ -96,6 +97,14 @@ class TestConfigApytram(unittest.TestCase):
                 Search = search("Trinity")
                 #print Search
                 self.assertIsNotNone(Search)
+                
+        def test_version_Trinity(self):
+                if search("Trinity"):
+                    Trinity_version = ApytramLib.Trinity.get_version()
+                    if re.search( "v2.3", Trinity_version):
+                        v = True
+                    else:
+                        print "\tCheck Trinity version >= 2.3"
 		
         #Check samtools:
         def test_samtools(self):
