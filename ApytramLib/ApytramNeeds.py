@@ -244,24 +244,28 @@ def set_directory_from_prefix(Prefix,DirType="",logger=""):
                 os.makedirs(DirName)
 
 
-def fastq2fasta(FastqFile,FastaFile):
+def fastq2fasta(FastqFiles,FastaFile):
     ExitCode = 1
-    command = """cat %s | awk 'NR%%4==1||NR%%4==2'  | tr "@" ">" > %s """ %(FastqFile, FastaFile)
-    p = subprocess.Popen(command,
-                          stdout = subprocess.PIPE,
-                          stderr = subprocess.PIPE,
-                          shell = True)
-    out, err = p.communicate()
+    command1 = """cat %s """ %(FastqFiles)
+    command2 = ["awk", """NR%4==1||NR%4==2"""]
+    command3 = ["tr", "@", ">"]
+    print command2
+    with open(FastaFile, 'w') as OutFile:
+        p1 = subprocess.Popen(command1.split(), stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(command2, stdin=p1.stdout, stdout=subprocess.PIPE)
+        p3 = subprocess.Popen(command3, stdin=p2.stdout, stdout=OutFile)
+        p1.stdout.close()
+        p2.stdout.close()
+        out, err = p3.communicate()
+        p1.wait()
+        p2.wait()
     return (out, err)
 
 def cat_fasta(FastaFiles,CatFastaFile):
-    ExitCode = 1
-    command = """cat %s > %s""" %(FastaFiles, CatFastaFile)
-    p = subprocess.Popen(command,
-                          stdout = subprocess.PIPE,
-                          stderr = subprocess.PIPE,
-                          shell = True)
-    (out, err) = p.communicate()
+    command = "cat %s" %(FastaFiles)
+    with open(CatFastaFile, 'w') as OutFile:
+        p = subprocess.Popen(command.split(), stdout = OutFile)
+        (out, err) = p.communicate()
     return (out, err)
 
 def complement(Sequence_str):
@@ -283,48 +287,28 @@ def write_in_file(String,Filename,mode = "w"):
 def add_paired_read_names(File, logger = ""):
     "Add paired read name to a read name list"
     if os.path.isfile(File):
-        command1 = """awk '{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}' %s  | sort -u > %s """ %(File, File+".paired")
-        command2 = "mv %s %s" %(File+".paired", File)
+        command1 = ["awk", """{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}""", File]
+        command2 = "sort -u -o %s" %(File)
+        p1 = subprocess.Popen(command1, stdout = subprocess.PIPE)
+        p2 = subprocess.Popen(command2.split(), stdin = p1.stdout,
+                              stdout = subprocess.PIPE )
+        p1.stdout.close()
+        (out, err) = p2.communicate()
+        p1.wait()
 
-        p1 = subprocess.Popen(command1,
-                          stdout = subprocess.PIPE,
-                          stderr = subprocess.PIPE,
-                          shell = True)
-        (out1, err1) = p1.communicate()
-        if not err1:
-            p2 = subprocess.Popen(command2,
-                          stdout = subprocess.PIPE,
-                          stderr = subprocess.PIPE,
-                          shell = True)
-            (out2, err2) = p2.communicate()
-            if err2 and logger:
-                logger.error(err2)
-        elif logger:
-            logger.error(err1)
+        if err:
+            logger.error(err)
     elif logger:
         logger.error("%s is not a file" %(File))
 
 def remove_duplicated_read_names(File,logger = ""):
     "remove duplicated read names"
     if os.path.isfile(File):
-        command1 = """sort -u %s > %s""" %(File, File+".uniq")
-        command2 = "mv %s %s" %(File+".uniq", File)
-        p1 = subprocess.Popen(command1,
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE,
-                              shell = True)
-        (out1, err1) = p1.communicate()
-        if not err1:
-            p2 = subprocess.Popen(command2,
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE,
-                              shell = True)
-            (out2, err2) = p2.communicate()
-            if err2 and logger:
-                logger.error(err2)
-        elif logger:
-            logger.error(err1)
-
+        command = """sort -u -o %s %s""" %(File, File)
+        p = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
+        (out, err) = p.communicate()
+        if err:
+            logger.error(err)
     elif logger:
         logger.error("File %s is not a valid path" %File)
 
@@ -351,29 +335,41 @@ def count_lines(Files):
     Number = 0
     if type(Files) != type([]):
         Files = [Files]
-
     for File in Files:
         if os.path.isfile(File):
-            Exit = subprocess.check_output(["wc", "-l", File])
-            Number += int(Exit.split(" ")[0])
+            with open(File, 'r') as InFile:
+                #Exit = subprocess.check_output(["wc", "-l", File])
+                command = "wc -l"
+                p = subprocess.Popen(command.split(),
+                                 stdin=InFile,
+                                 stdout=subprocess.PIPE)
+                (out, err) = p.communicate()
+                Number += int(out.strip())
     return Number
 
 def count_sequences(File):
-    Number = 0
+    out = "0\n"
     if os.path.isfile(File):
-        Exit = subprocess.check_output(["grep \"^>\" %s | wc -l" %File], shell=True)
-        Number = Exit.replace("\n","")
-    return int(Number)
+        #Exit = subprocess.check_output(["grep \"^>\" %s | wc -l" %File], shell=True)
+        #Number = Exit.replace("\n","")
+        command = """grep -c ^> %s""" %(File)
+        p = subprocess.Popen(command.split(),
+                             stdout=subprocess.PIPE)
+        (out, err) = p.communicate()
+    return int(out.strip())
 
 def split_readnames_in_right_left(File,Right,Left):
     if os.path.isfile(File):
-        command = """awk '{if (match($0,"1$")) print > "%s"; else print > "%s"}' %s""" %(Right,Left,File)
-        p = subprocess.Popen(command,
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE,
-                              shell = True)
-        out, err = p.communicate()
-        return (out, err)
+        command1 = ["grep", "1$", File]
+        command2 = ["grep", "2$", File]
+        with open(Right, 'w') as OutFileR:
+            p1 = subprocess.Popen(command1, stdout = OutFileR)
+            (_, err1) = p1.communicate()
+        with open(Left, 'w') as OutFileL:
+            p2 = subprocess.Popen(command2, stdout = OutFileL)
+            (_, err2) = p2.communicate()
+
+        return ("","")
     else:
         return("","File %s is not a valid path" %File)
 
@@ -381,9 +377,26 @@ def check_paired_data(FastaFile):
     BadReadName = ""
     if os.path.isfile(FastaFile):
         #Check First sequence name end with 1/ or 2/
-        Exit = subprocess.check_output(["grep", "-e", "^>",FastaFile, "-m", "100"])
-        Exit2 = subprocess.check_output(["tail %s -n 200 | grep -e \"^>\"" %FastaFile], shell=True)
-        ReadNames = (Exit+Exit2).strip().split("\n")
+        command1=["grep", "^>",FastaFile, "-m", "100"]
+        command21=["tac", FastaFile]
+        command22=["grep",  "-m",  "100",  """^>"""]
+
+        p1 = subprocess.Popen(command1, stdout = subprocess.PIPE)
+        (out1, err1) = p1.communicate()
+
+        with open(os.devnull, 'w')  as FNULL:
+            p21 = subprocess.Popen(command21, stdout = subprocess.PIPE,
+                            stderr = FNULL)
+        p22 = subprocess.Popen(command22, stdin=p21.stdout,
+                               stdout = subprocess.PIPE)
+
+        p21.stdout.close()
+        (out2, err2) =p22.communicate()
+        p21.wait()
+
+        #Exit = subprocess.check_output(["grep", "^>",FastaFile, "-m", "100"])
+        #Exit2 = subprocess.check_output(["tac %s | grep -m 100 \"^>\"" %FastaFile], shell=True)
+        ReadNames = (out1+out22).strip().split("\n")
         while (not BadReadName) and ReadNames:
             ReadName = ReadNames.pop()
             if not re.search("[12]$",ReadName):
@@ -399,7 +412,7 @@ def are_identical(File1, File2):
         if not diff:
             Identical = True
     return Identical
-    
+
 def number_new_reads(FileOld, FileNew, nb_intial=0):
     Nb = 0
     if os.path.isfile(FileNew) and  os.path.isfile(FileOld):
@@ -410,7 +423,7 @@ def number_new_reads(FileOld, FileNew, nb_intial=0):
         p2 = subprocess.Popen(command2.split(),
                              stdin=p1.stdout,
                              stdout=subprocess.PIPE)
-        # Allow process_curl to receive a SIGPIPE if process_wc exits.
+        # Allow p2 to receive a SIGPIPE if p1 exits.
         p1.stdout.close()
         (out, err) = p2.communicate()
         p1.wait()

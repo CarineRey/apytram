@@ -255,7 +255,7 @@ class RNA_species:
                 self.InputFastaFilename = "%s/input_fasta.fasta" %(self.TmpDirName)
                 self.logger.info("Concatenate fasta files")
                 start_convert = time.time()
-                (out,err) = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFastaFilename)
+                (out, err) = ApytramNeeds.cat_fasta(" ".join(args.fasta),InputFastaFilename)
                 if err:
                     self.logger.error(err)
                     ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
