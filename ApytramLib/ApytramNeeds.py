@@ -54,7 +54,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 #### Sequence class
 
-class Sequence:
+class Sequence(object):
     def __init__(self,):
         self.Name = ""
         self.OldName = ""
@@ -129,7 +129,7 @@ class Sequence:
 # print fd
 # fd.write_fasta("test")
 
-class Fasta:
+class Fasta(object):
     def __init__(self):
         self.Sequences = []
         self.Names = []

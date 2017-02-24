@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 #### Execution statistics class
-class Exec_stats:
+class Exec_stats(object):
     def __init__(self,start_time):
         New_Time_stat_dic = {"DatabaseBuilding": 0,
                              "Blast": 0,
@@ -99,7 +99,7 @@ class Exec_stats:
 
 #### RNA sample class
 
-class RNA_species:
+class RNA_species(object):
     def __init__(self,start_time,logger):
         self.logger = logger
         self.Species = ""
@@ -692,7 +692,7 @@ class RNA_species:
 
 #### query class
 
-class Query:
+class Query(object):
     def __init__(self,Name,QueryPath,logger):
         self.logger = logger
         self.Name = Name
