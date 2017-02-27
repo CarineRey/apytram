@@ -201,7 +201,7 @@ class RNA_species(object):
                 os.makedirs(OutDirName)
         self.OutDirPrefix = OutPrefixName
 
-    def build_database(self, FreeSpaceTmpDir, TmpDirName):
+    def prepare_database(self, FreeSpaceTmpDir, TmpDirName):
         start = time.time()
         self.logger.info("Database %s does not exist for the species: %s" % (self.DatabaseName, self.Species))
         self.DatabaseDirName = os.path.dirname(self.DatabaseName)
@@ -277,6 +277,10 @@ class RNA_species(object):
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
 
+    def build_database(self, FreeSpaceTmpDir, TmpDirName):
+        if not os.path.isfile(self.InputFastaFilename):
+            self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
+            ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         # Database building
         self.logger.info(self.DatabaseName + " database building")
         MakeblastdbProcess = BlastPlus.Makeblastdb(self.InputFastaFilename,self.DatabaseName)

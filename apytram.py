@@ -521,7 +521,7 @@ logger.debug("Time to parse input command line: %s", time.time() - start_time)
 
 if error > 0:
     if args.write_even_empty and error == empty_queries:
-        logger.warning("Some query files are empty, but you use --write_even_empty option -> empty file will be create")
+        logger.warning("Some query files are empty, but you use --write_even_empty option -> empty files will be create")
     else:
         logger.error("Error(s) occured, see above")
         ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
@@ -536,15 +536,36 @@ if StartIteration != 1 and not args.tmp:
 FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
+if UseMapper:
+    logger.warn("Use NextGenMapper instead of Blastn to fish reads.\nRequire raw reads:")
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList:
     if not Species.FormatedDatabase:
         Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+        Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
-    if UseMapper and Species.FormatedDatabase:
+    ### If Use mapper, apytram needs raw reads
+    if UseMapper:
+        if Species.InputFastaFilename:
+            logger.warn("\t-%s ... Raw reads available (%s)",Species.Species, Species.InputFastaFilename)
+            pass
+        elif Species.Fasta or Species.Fastq:
+            logger.warn("\t-%s ... Raw reads NOT available. Get it from Input Fasta or Fastq",Species.Species)
+            Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+            Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
+        elif Species.FormatedDatabase:
+            logger.warn("\t-%s ... Raw reads NOT available. Get it from the database",Species.Species)
+            Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+            Species.get_all_reads()
+
+    if UseMapper and Species.FormatedDatabase and not Species.InputFastaFilename:
         Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
         Species.get_all_reads()
+
+    if not Species.InputFastaFilename:
+        logger.error("No raw reads available for %s.", Species.Species)
+        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 ### If there is a query continue, else stop
 if not args.query:
