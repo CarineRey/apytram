@@ -174,8 +174,8 @@ SearchOptions.add_argument('-e', '--evalue', type=positive_float,
                     default=1e-5)
 
 SearchOptions.add_argument('-id', '--min_id', type=positive_integer,
-                    help="Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 50)",
-                    default=50)
+                    help="Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 70)",
+                    default=70)
 SearchOptions.add_argument('-mal', '--min_ali_len', type=positive_integer,
                     help="Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default=180)
@@ -222,6 +222,9 @@ MiscellaneousOptions.add_argument('-memory', type=positive_integer,
 MiscellaneousOptions.add_argument('-time_max', type=positive_integer,
                     help="Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
                     default=7200)
+MiscellaneousOptions.add_argument('--UseMapper', action='store_true',
+                    help="Use NextGenMapper instead of balstn to fish reads",
+                    default=False)
 MiscellaneousOptions.add_argument('--write_even_empty', action='store_true',
                         default=False,
                         help="Write output fasta files, even if they must be empty. (Default: False)")
@@ -299,7 +302,7 @@ else:
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
 
-
+UseMapper = args.UseMapper
 
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
@@ -539,6 +542,9 @@ for Species in SpeciesList:
     if not Species.FormatedDatabase:
         Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
+    if UseMapper and Species.FormatedDatabase:
+        Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+        Species.get_all_reads()
 
 ### If there is a query continue, else stop
 if not args.query:
@@ -589,7 +595,7 @@ for Query in QueriesList:
                 ### Blast bait sequences on database of reads
                 # Write read names in ReadNamesFile if the file does not exist
                 if not os.path.isfile(Species.ReadNamesFilename):
-                    Species.launch_Blastn(Query.BaitSequences, Threads)
+                    Species.fish_reads(Query.BaitSequences, Threads, mapper=UseMapper)
                 else:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 

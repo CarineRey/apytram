@@ -443,13 +443,14 @@ def check_almost_identical_exonerate_results(ExonerateResult):
     List = ExonerateResult.strip().split("\n")
     for line in List:
         ListLine = line.split("\t")
-        #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\t\n"
-        pi = float(ListLine[6])
-        ql = float(ListLine[2])
-        tl = float(ListLine[5])
-        pl = min( ql, tl) / max( ql, tl)
-        if (pl >= 0.99) and (pi > 98) :
-            i += 1
+        if len(ListLine) > 7:
+            #ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\t\n"
+            pi = float(ListLine[6])
+            ql = float(ListLine[2])
+            tl = float(ListLine[5])
+            pl = min( ql, tl) / max( ql, tl)
+            if (pl >= 0.99) and (pi > 98) :
+                i += 1
 
     if len(List) == i:
         Result = True

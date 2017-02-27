@@ -47,6 +47,7 @@ import ApytramNeeds
 import Aligner
 import BlastPlus
 import Trinity
+import Ngm
 
 import pandas
 import matplotlib
@@ -59,6 +60,7 @@ class Exec_stats(object):
     def __init__(self,start_time):
         New_Time_stat_dic = {"DatabaseBuilding": 0,
                              "Blast": 0,
+                             "Ngm": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
                              "Exonerate_1":0,
@@ -290,6 +292,11 @@ class RNA_species(object):
             self.add_time_statistic("DatabaseBuilding", start = start)
             self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
 
+    def get_all_reads(self):
+         self.InputFastaFilename = "%s/input_fastq.fasta" %(self.TmpDirName)
+         BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, "", "")
+         (out,err) = BlastdbcmdProcess.get_all_seq(self.InputFastaFilename)
+
     def new_iteration(self):
 
         self.ExecutionStats.StartIterTime = time.time()
@@ -324,6 +331,13 @@ class RNA_species(object):
 
         self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
+    def fish_reads(self, BaitSequencesFilename,Threads, mapper=False):
+        if mapper:
+            self.launch_ngm(BaitSequencesFilename,Threads)
+
+        else:
+            self.launch_Blastn(BaitSequencesFilename,Threads)
+
     def launch_Blastn(self,BaitSequencesFilename,Threads):
         start = time.time()
         self.logger.info("Blast bait sequences on reads database")
@@ -336,6 +350,20 @@ class RNA_species(object):
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast", start = start)
         self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
+
+    def launch_ngm(self,BaitSequencesFilename,Threads):
+        start = time.time()
+        self.logger.info("Map reads (%s) on bait sequences", self.InputFastaFilename)
+        NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename)
+        NgmProcess.sensitivity = 1
+        NgmProcess.min_identity = 0.85     #-i/--min-identity
+        NgmProcess.min_residues = 0.35     #-R/--min-residues
+        NgmProcess.min_mq = 0
+        NgmProcess.threads = Threads
+
+        (out,err) = NgmProcess.launch()
+        self.add_time_statistic("Ngm", start = start)
+        self.logger.info("End Ngm (%s seconds)" %(self.get_time_statistic("Ngm")))
 
     def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
         start = time.time()
