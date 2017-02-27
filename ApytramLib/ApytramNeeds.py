@@ -376,7 +376,7 @@ def check_paired_data(FastaFile):
     if os.path.isfile(FastaFile):
         #Check First sequence name end with 1/ or 2/
         command1=["grep", "^>",FastaFile, "-m", "100"]
-        command21=["tac", FastaFile]
+        command21=["tail", "-n" , "300",  FastaFile]
         command22=["grep",  "-m",  "100",  """^>"""]
 
         p1 = subprocess.Popen(command1, stdout = subprocess.PIPE)
@@ -389,7 +389,7 @@ def check_paired_data(FastaFile):
                                stdout = subprocess.PIPE)
 
         p21.stdout.close()
-        (out2, err2) =p22.communicate()
+        (out2, err2) = p22.communicate()
         p21.wait()
 
         #Exit = subprocess.check_output(["grep", "^>",FastaFile, "-m", "100"])
