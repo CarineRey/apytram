@@ -559,13 +559,9 @@ for Species in SpeciesList:
             Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
             Species.get_all_reads()
 
-    if UseMapper and Species.FormatedDatabase and not Species.InputFastaFilename:
-        Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
-        Species.get_all_reads()
-
-    if not Species.InputFastaFilename:
-        logger.error("No raw reads available for %s.", Species.Species)
-        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        if not Species.InputFastaFilename:
+            logger.error("No raw reads available for %s.", Species.Species)
+            ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 ### If there is a query continue, else stop
 if not args.query:
@@ -651,7 +647,10 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 ### Retrieve reads sequences
-                Species.get_read_sequences_by_blasdbcmd(Threads, Memory)
+                if Species.InputFastaFilename:
+                    Species.get_read_sequences(Threads, Memory, meth="seqtk")
+                else:
+                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd")
 
                 ### Launch Trinity
                 Species.launch_Trinity(Threads, Memory)

@@ -48,6 +48,7 @@ import Aligner
 import BlastPlus
 import Trinity
 import Ngm
+import Seqtk
 
 import pandas
 import matplotlib
@@ -59,8 +60,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 class Exec_stats(object):
     def __init__(self,start_time):
         New_Time_stat_dic = {"DatabaseBuilding": 0,
+                             "DatabasePreparation": 0,
                              "Blast": 0,
                              "Ngm": 0,
+                             "Seqtk": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
                              "Exonerate_1":0,
@@ -272,12 +275,16 @@ class RNA_species(object):
             if BadReadName:
                 self.logger.error("Paired read names must finished by 1 or 2. %s is uncorrect" %(BadReadName))
                 ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+
+        self.add_time_statistic("DatabasePreparation", start = start)
         #Build blast formated database from a fasta file
         if not os.path.isfile(self.InputFastaFilename):
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
 
+
     def build_database(self, FreeSpaceTmpDir, TmpDirName):
+        start = time.time()
         if not os.path.isfile(self.InputFastaFilename):
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
@@ -369,7 +376,7 @@ class RNA_species(object):
         self.add_time_statistic("Ngm", start = start)
         self.logger.info("End Ngm (%s seconds)" %(self.get_time_statistic("Ngm")))
 
-    def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
+    def get_read_sequences(self, Threads, Memory, meth="seqtk"):
         start = time.time()
         if self.PairedData:
             self.logger.info("Split read names depending on 1/ or 2/")
@@ -385,14 +392,20 @@ class RNA_species(object):
         for strand in StrandList:
             ReadFastaFilename = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration,strand)
             ReadNamesFilename = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration,strand)
-            BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, ReadNamesFilename, ReadFastaFilename)
+
             if not os.path.isfile(ReadFastaFilename):
-                (out,err) = BlastdbcmdProcess.launch()
+                if meth == "blastdbcmd":
+                    BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, ReadNamesFilename, ReadFastaFilename)
+                    (out,err) = BlastdbcmdProcess.launch()
+                    self.add_time_statistic("Blastdbcmd", start = start)
+                    self.logger.debug("Blastdbcmd --- %s seconds ---" %(self.get_time_statistic("Blastdbcmd")))
+                else:
+                    SeqtkProcess = Seqtk.Seqtk(fasta=self.InputFastaFilename)
+                    (out,err) = SeqtkProcess.launch_fasta_subseq(ReadNamesFilename, ReadFastaFilename)
+                    self.add_time_statistic("Seqtk", start = start)
+                    self.logger.debug("Seqtk --- %s seconds ---" %(self.get_time_statistic("Seqtk")))
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
-
-        self.add_time_statistic("Blastdbcmd", start = start)
-        self.logger.debug("Blastdbcmd --- %s seconds ---" %(self.get_time_statistic("Blastdbcmd")))
 
     def launch_Trinity(self, Threads, Memory):
         start = time.time()
