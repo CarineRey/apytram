@@ -47,6 +47,7 @@ import ApytramNeeds
 import Aligner
 import BlastPlus
 import Trinity
+import Ngm
 
 import pandas
 import matplotlib
@@ -59,6 +60,7 @@ class Exec_stats(object):
     def __init__(self,start_time):
         New_Time_stat_dic = {"DatabaseBuilding": 0,
                              "Blast": 0,
+                             "Ngm": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
                              "Exonerate_1":0,
@@ -199,7 +201,7 @@ class RNA_species(object):
                 os.makedirs(OutDirName)
         self.OutDirPrefix = OutPrefixName
 
-    def build_database(self, FreeSpaceTmpDir, TmpDirName):
+    def prepare_database(self, FreeSpaceTmpDir, TmpDirName):
         start = time.time()
         self.logger.info("Database %s does not exist for the species: %s" % (self.DatabaseName, self.Species))
         self.DatabaseDirName = os.path.dirname(self.DatabaseName)
@@ -275,6 +277,10 @@ class RNA_species(object):
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
 
+    def build_database(self, FreeSpaceTmpDir, TmpDirName):
+        if not os.path.isfile(self.InputFastaFilename):
+            self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
+            ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         # Database building
         self.logger.info(self.DatabaseName + " database building")
         MakeblastdbProcess = BlastPlus.Makeblastdb(self.InputFastaFilename,self.DatabaseName)
@@ -289,6 +295,11 @@ class RNA_species(object):
         else:
             self.add_time_statistic("DatabaseBuilding", start = start)
             self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
+
+    def get_all_reads(self):
+         self.InputFastaFilename = "%s/input_fastq.fasta" %(self.TmpDirName)
+         BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, "", "")
+         (out,err) = BlastdbcmdProcess.get_all_seq(self.InputFastaFilename)
 
     def new_iteration(self):
 
@@ -324,6 +335,13 @@ class RNA_species(object):
 
         self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
+    def fish_reads(self, BaitSequencesFilename,Threads, mapper=False):
+        if mapper:
+            self.launch_ngm(BaitSequencesFilename,Threads)
+
+        else:
+            self.launch_Blastn(BaitSequencesFilename,Threads)
+
     def launch_Blastn(self,BaitSequencesFilename,Threads):
         start = time.time()
         self.logger.info("Blast bait sequences on reads database")
@@ -336,6 +354,20 @@ class RNA_species(object):
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast", start = start)
         self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
+
+    def launch_ngm(self,BaitSequencesFilename,Threads):
+        start = time.time()
+        self.logger.info("Map reads (%s) on bait sequences", self.InputFastaFilename)
+        NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename)
+        NgmProcess.sensitivity = 1
+        NgmProcess.min_identity = 0.85     #-i/--min-identity
+        NgmProcess.min_residues = 0.35     #-R/--min-residues
+        NgmProcess.min_mq = 0
+        NgmProcess.threads = Threads
+
+        (out,err) = NgmProcess.launch()
+        self.add_time_statistic("Ngm", start = start)
+        self.logger.info("End Ngm (%s seconds)" %(self.get_time_statistic("Ngm")))
 
     def get_read_sequences_by_blasdbcmd(self, Threads, Memory):
         start = time.time()

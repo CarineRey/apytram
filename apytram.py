@@ -174,8 +174,8 @@ SearchOptions.add_argument('-e', '--evalue', type=positive_float,
                     default=1e-5)
 
 SearchOptions.add_argument('-id', '--min_id', type=positive_integer,
-                    help="Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 50)",
-                    default=50)
+                    help="Minimum identity percentage of a sequence with a query on the length of their alignment so that the sequence is kept at the end of a iteration (Default 70)",
+                    default=70)
 SearchOptions.add_argument('-mal', '--min_ali_len', type=positive_integer,
                     help="Minimum alignment length of a sequence on a query to be kept at the end of a iteration (Default 180)",
                     default=180)
@@ -222,6 +222,9 @@ MiscellaneousOptions.add_argument('-memory', type=positive_integer,
 MiscellaneousOptions.add_argument('-time_max', type=positive_integer,
                     help="Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
                     default=7200)
+MiscellaneousOptions.add_argument('--UseMapper', action='store_true',
+                    help="Use NextGenMapper instead of balstn to fish reads",
+                    default=False)
 MiscellaneousOptions.add_argument('--write_even_empty', action='store_true',
                         default=False,
                         help="Write output fasta files, even if they must be empty. (Default: False)")
@@ -299,7 +302,7 @@ else:
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
 
-
+UseMapper = args.UseMapper
 
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
@@ -518,7 +521,7 @@ logger.debug("Time to parse input command line: %s", time.time() - start_time)
 
 if error > 0:
     if args.write_even_empty and error == empty_queries:
-        logger.warning("Some query files are empty, but you use --write_even_empty option -> empty file will be create")
+        logger.warning("Some query files are empty, but you use --write_even_empty option -> empty files will be create")
     else:
         logger.error("Error(s) occured, see above")
         ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
@@ -533,12 +536,36 @@ if StartIteration != 1 and not args.tmp:
 FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
+if UseMapper:
+    logger.warn("Use NextGenMapper instead of Blastn to fish reads.\nRequire raw reads:")
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList:
     if not Species.FormatedDatabase:
         Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+        Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
+    ### If Use mapper, apytram needs raw reads
+    if UseMapper:
+        if Species.InputFastaFilename:
+            logger.warn("\t-%s ... Raw reads available (%s)",Species.Species, Species.InputFastaFilename)
+            pass
+        elif Species.Fasta or Species.Fastq:
+            logger.warn("\t-%s ... Raw reads NOT available. Get it from Input Fasta or Fastq",Species.Species)
+            Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+            Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
+        elif Species.FormatedDatabase:
+            logger.warn("\t-%s ... Raw reads NOT available. Get it from the database",Species.Species)
+            Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+            Species.get_all_reads()
+
+    if UseMapper and Species.FormatedDatabase and not Species.InputFastaFilename:
+        Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+        Species.get_all_reads()
+
+    if not Species.InputFastaFilename:
+        logger.error("No raw reads available for %s.", Species.Species)
+        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 ### If there is a query continue, else stop
 if not args.query:
@@ -589,7 +616,7 @@ for Query in QueriesList:
                 ### Blast bait sequences on database of reads
                 # Write read names in ReadNamesFile if the file does not exist
                 if not os.path.isfile(Species.ReadNamesFilename):
-                    Species.launch_Blastn(Query.BaitSequences, Threads)
+                    Species.fish_reads(Query.BaitSequences, Threads, mapper=UseMapper)
                 else:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 

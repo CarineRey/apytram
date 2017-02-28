@@ -49,10 +49,22 @@ WORKDIR /opt/trinityrnaseq-Trinity-v2.3.2/
 RUN make
 ENV PATH $PATH:/opt/trinityrnaseq-Trinity-v2.3.2/:/opt/trinityrnaseq-Trinity-v2.3.2/trinity-plugins/
 
+### install NextGenMap
+
+WORKDIR /opt
+RUN git clone https://github.com/Cibiv/NextGenMap.git 
+WORKDIR /opt/NextGenMap/
+RUN mkdir build
+WORKDIR /opt/NextGenMap/build
+RUN apt-get install --no-install-recommends  -qy cmake
+RUN cmake .. && make
+RUN make install prefix=/usr/local/bin
+ENV PATH /opt/NextGenMap/bin/ngm-0.5.3:$PATH
+
 
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
-ENV PATH $PATH:/opt/apytram
+ENV PATH /opt/apytram:$PATH
 
 
 ### 

@@ -134,6 +134,17 @@ class Blastdbcmd(object):
         if err:
             self.logger.error(err)
         return (out, err)
+    def get_all_seq(self,OutputFile):
+        command = ["blastdbcmd", "-db", self.Database, "-entry", "all",
+                   "-out", OutputFile]
+        self.logger.debug(" ".join(command))
+        p = subprocess.Popen(command,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        (out, err) = p.communicate()
+        if err:
+            self.logger.error(err)
+        return (out, err)
 
     def is_database(self):
         Out = False
