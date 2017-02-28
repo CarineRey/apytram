@@ -619,15 +619,15 @@ for Query in QueriesList:
                 if Species.PairedData:
                     # Get paired reads names and remove duplicated names
                     logger.info("Get paired reads names and remove duplicated names")
-                    ApytramLib.ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, logger)
+                    ApytramLib.ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
                 else:
                     # Remove duplicated names
                     logger.info("Remove duplicated names")
-                    ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, logger)
+                    ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
 
                 # Count the number of reads which will be used in the Trinity assembly
                 logger.info("Count the number of reads")
-                Species.ReadsNumber = ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename)
+                Species.ReadsNumber = ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename)
                 Species.add_iter_statistic("ReadsNumber", Species.ReadsNumber)
 
                 if not Species.ReadsNumber:
@@ -637,7 +637,7 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
-                NbNewReads = ApytramLib.ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ReadNamesFilename, nb_intial=Species.ReadsNumber)
+                NbNewReads = ApytramLib.ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ParsedReadNamesFilename, nb_intial=Species.ReadsNumber)
                 logger.warning("Iteration: %s - Species: %s - Number of new reads: %s", Species.CurrentIteration, Species.Species, NbNewReads)
 
                 if (NbNewReads == 0) and not FinishAllIter:

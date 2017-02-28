@@ -40,12 +40,12 @@ import subprocess
 
 class Ngm(object):
     """Define an object to create a ngm instance"""
-    def __init__(self, reference, query, sam="", output_readnames=""):
+    def __init__(self, reference, query, sam="", output_readnames="", output_fasta = ""):
         self.logger = logging.getLogger('apytram.lib.Ngm.ngm')
         self.reference = reference
         self.query = query
-        
-        
+
+
         self.sensitivity = 1      # --threads
         self.threads = 1          # --sensitivity
         self.min_identity = 0     #-i/--min-identity
@@ -56,6 +56,7 @@ class Ngm(object):
 
         self.no_unal = True        #--no-unal
         self.sam = sam             #--output
+        self.output_fasta = output_fasta
         self.output_readnames = output_readnames
 
 
@@ -74,8 +75,8 @@ class Ngm(object):
             command.extend(["--min-mq", str(self.min_mq)])
         if self.no_unal:
             command.extend(["--no-unal"])
-            
-        
+
+
         if self.sam:
             command.extend(["--output", self.sam])
             self.logger.debug(" ".join(command))
@@ -83,19 +84,33 @@ class Ngm(object):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
             (out, err) = p.communicate()
-        
-        elif self.output_readnames:
-            self.logger.debug(" ".join(command) + """ | cut -f 1 | grep -v -e "^@" """)
-            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)                    
-            p1 = subprocess.Popen(["cut", "-f", "1"], stdin=p.stdout, stdout = subprocess.PIPE)
+
+        elif self.output_fasta and self.output_readnames:
+            self.logger.debug(" ".join(command) + """ | awk '{OFS="\\t"; if ( $1 !~ /^@/) print '>'$1"\\n"$10}' """)
+            # mapping via ngm
+            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # sam to fasta
+            p1 = subprocess.Popen(["awk", """{OFS="\\t"; if ( $1 !~ /^@/) {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
             with open(self.output_readnames, 'w') as OUTPUTFILE:
-                p2 = subprocess.Popen(["grep", "-v", "^@"], stdin=p1.stdout, stdout = OUTPUTFILE)
-            
+                p2 = subprocess.Popen(["sort", "-u"], stdin=p1.stdout, stdout = OUTPUTFILE)
+
             p1.wait()
             p1.stdout.close()
             p2.wait()
             (out, err) = p.communicate()
-        
+
+        elif self.output_readnames:
+            self.logger.debug(" ".join(command) + """ | cut -f 1 | grep -v -e "^@" """)
+            p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p1 = subprocess.Popen(["cut", "-f", "1"], stdin=p.stdout, stdout = subprocess.PIPE)
+            with open(self.output_readnames, 'w') as OUTPUTFILE:
+                p2 = subprocess.Popen(["grep", "-v", "^@"], stdin=p1.stdout, stdout = OUTPUTFILE)
+
+            p1.wait()
+            p1.stdout.close()
+            p2.wait()
+            (out, err) = p.communicate()
+
         if os.path.isfile(self.output_readnames) and (os.stat(self.output_readnames).st_size == 0):
             if err:
                 self.logger.error(err)

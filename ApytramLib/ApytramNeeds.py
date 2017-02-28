@@ -282,11 +282,11 @@ def write_in_file(String,Filename,mode = "w"):
         with open(Filename,mode) as File:
             File.write(String)
 
-def add_paired_read_names(File, logger = ""):
+def add_paired_read_names(File, NewFile, logger = ""):
     "Add paired read name to a read name list"
     if os.path.isfile(File):
         command1 = ["awk", """{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}""", File]
-        command2 = "sort -u -o %s" %(File)
+        command2 = "sort -u -o %s" %(NewFile)
         p1 = subprocess.Popen(command1, stdout = subprocess.PIPE)
         p2 = subprocess.Popen(command2.split(), stdin = p1.stdout,
                               stdout = subprocess.PIPE )
@@ -299,10 +299,10 @@ def add_paired_read_names(File, logger = ""):
     elif logger:
         logger.error("%s is not a file" %(File))
 
-def remove_duplicated_read_names(File,logger = ""):
+def remove_duplicated_read_names(File, NewFile, logger = ""):
     "remove duplicated read names"
     if os.path.isfile(File):
-        command = """sort -u -o %s %s""" %(File, File)
+        command = """sort -u -o %s %s""" %(File, NewFile)
         p = subprocess.Popen(command.split(), stdout = subprocess.PIPE)
         (out, err) = p.communicate()
         if err:
@@ -435,6 +435,16 @@ def number_new_reads(FileOld, FileNew, nb_intial=0):
         Nb = nb_intial
     return Nb
 
+def new_reads(FileOld, FileNew, DiffFile):
+    if os.path.isfile(FileNew) and os.path.isfile(FileOld):
+        command1 = "join -v 2 %s %s" %(FileOld, FileNew)
+        with open(DiffFile, "w") as OUTPUTFILE:
+            p1 = subprocess.Popen(command1.split(),
+                             stdout=OUTPUTFILE)
+        (out, err) = p1.communicate()
+        return(count_lines(DiffFile))
+    else:
+        return(0)
 
 def check_almost_identical_exonerate_results(ExonerateResult):
     "Return True if all hit have a hit with 99% > id and a len = 98% len query "

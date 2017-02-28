@@ -139,6 +139,7 @@ class RNA_species(object):
         # Intermediary files
 
         self.ReadNamesFilename = ""
+        self.ParsedReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
         self.TrinityExonerateResult = ""
@@ -315,7 +316,7 @@ class RNA_species(object):
         # Cleaning
 
         # Previous Iteration
-        self.PreviousReadNamesFilename = self.ReadNamesFilename
+        self.PreviousReadNamesFilename = self.ParsedReadNamesFilename
         self.PreviousFilteredTrinityFastaFilename = self.FilteredTrinityFastaFilename
 
         # New names files
@@ -327,12 +328,13 @@ class RNA_species(object):
         self.ExecutionStats.new_iteration(self.CurrentIteration)
 
         self.ReadNamesFilename = "%s/ReadNames.%d.txt" %(self.TmpDirName,self.CurrentIteration)
+        self.ParsedReadNamesFilename = "%s/ParsedReadNames.%d.txt" %(self.TmpDirName,self.CurrentIteration)
         self.ReadsNumber = 0
 
         self.ReadNamesFilename_Right = "%s/ReadNames.%d.1.txt" % (self.TmpDirName,self.CurrentIteration)
         self.ReadNamesFilename_Left  = "%s/ReadNames.%d.2.txt" % (self.TmpDirName,self.CurrentIteration)
-        self.ReadFastaFilename_Right     = "%s/Reads.%d.1.fasta"   % (self.TmpDirName,self.CurrentIteration)
-        self.ReadFastaFilename_Left      = "%s/Reads.%d.2.fasta"   % (self.TmpDirName,self.CurrentIteration)
+        self.ReadFastaFilename_Right = "%s/Reads.%d.1.fasta"   % (self.TmpDirName,self.CurrentIteration)
+        self.ReadFastaFilename_Left  = "%s/Reads.%d.2.fasta"   % (self.TmpDirName,self.CurrentIteration)
 
         self.ReadFastaFilename      = "%s/Reads.%d.fasta"   % (self.TmpDirName,self.CurrentIteration)
 
@@ -356,7 +358,7 @@ class RNA_species(object):
         BlastnProcess.Evalue = self.Evalue
         BlastnProcess.Task = "blastn"
         BlastnProcess.Threads = Threads
-        BlastnProcess.OutFormat = "6 sacc"
+        BlastnProcess.OutFormat = "6 sacc" #qseq
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast", start = start)
@@ -365,7 +367,7 @@ class RNA_species(object):
     def launch_ngm(self,BaitSequencesFilename,Threads):
         start = time.time()
         self.logger.info("Map reads (%s) on bait sequences", self.InputFastaFilename)
-        NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename)
+        NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename, output_fasta=self.ReadNamesFilename+".fasta")
         NgmProcess.sensitivity = 1
         NgmProcess.min_identity = 0.85     #-i/--min-identity
         NgmProcess.min_residues = 0.35     #-R/--min-residues
@@ -380,7 +382,7 @@ class RNA_species(object):
         start = time.time()
         if self.PairedData:
             self.logger.info("Split read names depending on 1/ or 2/")
-            (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ReadNamesFilename,self.ReadNamesFilename_Right,self.ReadNamesFilename_Left)
+            (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ParsedReadNamesFilename,self.ReadNamesFilename_Right,self.ReadNamesFilename_Left)
             if err:
                 self.logger.error(err)
             StrandList = [".1",".2"]
@@ -393,17 +395,35 @@ class RNA_species(object):
             ReadFastaFilename = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration,strand)
             ReadNamesFilename = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration,strand)
 
-            if not os.path.isfile(ReadFastaFilename):
+            if (not os.path.isfile(ReadFastaFilename)) or (os.stat(ReadFastaFilename).st_size == 0):
                 if meth == "blastdbcmd":
                     BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, ReadNamesFilename, ReadFastaFilename)
                     (out,err) = BlastdbcmdProcess.launch()
                     self.add_time_statistic("Blastdbcmd", start = start)
-                    self.logger.debug("Blastdbcmd --- %s seconds ---" %(self.get_time_statistic("Blastdbcmd")))
+                    self.logger.debug("Blastdbcmd %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
                 else:
-                    SeqtkProcess = Seqtk.Seqtk(fasta=self.InputFastaFilename)
-                    (out,err) = SeqtkProcess.launch_fasta_subseq(ReadNamesFilename, ReadFastaFilename)
-                    self.add_time_statistic("Seqtk", start = start)
-                    self.logger.debug("Seqtk --- %s seconds ---" %(self.get_time_statistic("Seqtk")))
+                    if os.path.isfile(self.ReadNamesFilename+".fasta"):
+                        # Get fasta seq for read fish via ngm
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.ReadNamesFilename+".fasta")
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(ReadNamesFilename, ReadFastaFilename)
+
+                        # Add fasta seq for read not fish via ngm (paired read)
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.InputFastaFilename)
+                        NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                        ## That means present in ReadNamesFilename but not in self.ReadNamesFilename
+                        Nb_added_reads = ApytramNeeds.new_reads(self.ReadNamesFilename, ReadNamesFilename, NewReadNamesFilename)
+                        if Nb_added_reads:
+                            self.logger.debug("Add %s new reads" %(Nb_added_reads))
+                            (out,err) = SeqtkProcess.launch_fasta_subseq(NewReadNamesFilename, ReadFastaFilename, mode="a")
+
+
+                        self.add_time_statistic("Seqtk", start = start)
+                        self.logger.debug("Seqtk %s --- %s seconds ---" %(strand, self.get_time_statistic("Seqtk")))
+                    else:
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.InputFastaFilename)
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(ReadNamesFilename, ReadFastaFilename)
+                        self.add_time_statistic("Seqtk", start = start)
+                        self.logger.debug("Seqtk %s --- %s seconds ---" %(strand, self.get_time_statistic("Seqtk")))
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
