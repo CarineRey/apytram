@@ -368,7 +368,7 @@ class RNA_species(object):
         start = time.time()
         self.logger.info("Map reads (%s) on bait sequences", self.InputFastaFilename)
         NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename, output_fasta=self.ReadNamesFilename+".fasta")
-        NgmProcess.sensitivity = 0.3
+        NgmProcess.sensitivity = 1
         if self.CurrentIteration == 1: # first iteration bait sequence can be divergente
             NgmProcess.min_identity = 0.85    #-i/--min-identity
             NgmProcess.min_residues = 0.40    #-R/--min-residues
