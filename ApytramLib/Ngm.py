@@ -86,11 +86,11 @@ class Ngm(object):
             (out, err) = p.communicate()
 
         elif self.output_fasta and self.output_readnames:
-            self.logger.debug(" ".join(command) + """ | awk '{OFS="\\t"; gsub("AS:i:","", $12) ;   if (( $1 !~ /^@/ ) && (($12+0) > 300)) {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta)
+            self.logger.debug(" ".join(command) + """ | awk '{OFS="\\t"; gsub("XR:i:","", $18) ;   if (( $1 !~ /^@/ ) && (($18+0) > 30)) {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta)
             # mapping via ngm
             p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             # sam to fasta
-            p1 = subprocess.Popen(["awk", """{OFS="\\t"; gsub("AS:i:","", $12) ;  if (( $1 !~ /^@/ ) && (($12+0) > 300))  {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
+            p1 = subprocess.Popen(["awk", """{OFS="\\t"; gsub("XR:i:","", $18) ;  if (( $1 !~ /^@/ ) && (($18+0) > 30))  {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
             with open(self.output_readnames, 'w') as OUTPUTFILE:
                 p2 = subprocess.Popen(["sort", "-u"], stdin=p1.stdout, stdout = OUTPUTFILE)
 

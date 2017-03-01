@@ -370,11 +370,11 @@ class RNA_species(object):
         NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename, output_fasta=self.ReadNamesFilename+".fasta")
         NgmProcess.sensitivity = 1
         if self.CurrentIteration == 1: # first iteration bait sequence can be divergente
-            NgmProcess.min_identity = 0.85    #-i/--min-identity
-            NgmProcess.min_residues = 0.40    #-R/--min-residues
+            NgmProcess.min_identity = 0.75    #-i/--min-identity
+            NgmProcess.min_residues = 0.70    #-R/--min-residues
         else: # other iteration -> less authorized divergente because same species
-            NgmProcess.min_identity = 0.90     #-i/--min-identity
-            NgmProcess.min_residues = 0.30     #-R/--min-residues
+            NgmProcess.min_identity = 0.95     #-i/--min-identity
+            NgmProcess.min_residues = 0.30    #-R/--min-residues
         NgmProcess.min_mq = 0
         NgmProcess.threads = Threads
 
