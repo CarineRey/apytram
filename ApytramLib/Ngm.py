@@ -46,7 +46,7 @@ class Ngm(object):
         self.query = query
 
 
-        self.sensitivity = 1      # --threads
+        self.sensitivity = None      # --threads
         self.threads = 1          # --sensitivity
         self.min_identity = 0     #-i/--min-identity
         self.min_residues = 0     #-R/--min-residues
@@ -65,7 +65,7 @@ class Ngm(object):
 
         if self.threads != 1:
             command.extend(["-t", str(self.threads)])
-        if self.sensitivity != 1:
+        if self.sensitivity != None:
             command.extend(["--sensitivity", str(self.sensitivity)])
         if self.min_identity != 0:
             command.extend(["--min-identity", str(self.min_identity)])
@@ -86,11 +86,11 @@ class Ngm(object):
             (out, err) = p.communicate()
 
         elif self.output_fasta and self.output_readnames:
-            self.logger.debug(" ".join(command) + """ | awk '{OFS="\\t"; if ( $1 !~ /^@/) print '>'$1"\\n"$10}' """)
+            self.logger.debug(" ".join(command) + """ | awk '{OFS="\\t"; gsub("AS:i:","", $12) ;   if (( $1 !~ /^@/ ) && (($12+0) > 300)) {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta)
             # mapping via ngm
             p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             # sam to fasta
-            p1 = subprocess.Popen(["awk", """{OFS="\\t"; if ( $1 !~ /^@/) {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
+            p1 = subprocess.Popen(["awk", """{OFS="\\t"; gsub("AS:i:","", $12) ;  if (( $1 !~ /^@/ ) && (($12+0) > 300))  {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
             with open(self.output_readnames, 'w') as OUTPUTFILE:
                 p2 = subprocess.Popen(["sort", "-u"], stdin=p1.stdout, stdout = OUTPUTFILE)
 

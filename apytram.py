@@ -551,11 +551,11 @@ for Species in SpeciesList:
             logger.warn("\t-%s ... Raw reads available (%s)",Species.Species, Species.InputFastaFilename)
             pass
         elif Species.Fasta or Species.Fastq:
-            logger.warn("\t-%s ... Raw reads NOT available. Get it from Input Fasta or Fastq",Species.Species)
+            logger.warn("\t-%s ... Raw reads needed. Get it from Input Fasta or Fastq",Species.Species)
             Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
             Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         elif Species.FormatedDatabase:
-            logger.warn("\t-%s ... Raw reads NOT available. Get it from the database",Species.Species)
+            logger.warn("\t-%s ... Raw reads needed. Get it from the database",Species.Species)
             Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
             Species.get_all_reads()
 
