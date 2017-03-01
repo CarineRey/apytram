@@ -484,13 +484,13 @@ class RNA_species(object):
         (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
         # Write the result in a file
         if self.TrinityExonerateResult:
-            ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)
+            ApytramNeeds.write_in_file(self.TrinityExonerateResult, self.TrinityExonerateFilename)
         else:
             self.logger.info("Reconstructed sequences but no homologous with references")
             self.logger.info("Try to get homologies with a more sensible model")
             ### Try to get homologies with a more sensible model
             self.TrinityExonerateFile = "%s/Trinity_iter_%d.exonerate_coding2g" %(self.TmpDirName,self.CurrentIteration)
-            TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery,self.TrinityFastaFilename)
+            TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
             # Keep only the best hit for each contig from Trinity
             TrinityExonerateProcess.Bestn = 1
             TrinityExonerateProcess.Model = "coding2genome"
