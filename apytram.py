@@ -304,6 +304,10 @@ MaxIteration = args.iteration_max
 
 UseMapper = args.UseMapper
 
+if UseMapper and (not ApytramLib.ApytramNeeds.search("ngm")):
+        logger.error("ngm not in the PATH !")
+        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
     error += 1
@@ -326,6 +330,10 @@ Threads = args.threads
 Memory = args.memory
 MaxTime = args.time_max
 
+
+SeqtkAvailable = ApytramLib.ApytramNeeds.search("seqtk")
+if SeqtkAvailable:
+    logger.warning("seqtk available in the PATH. We will use it")
 
 if args.plot:
     args.stats = True
@@ -536,8 +544,12 @@ if StartIteration != 1 and not args.tmp:
 FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
+
+
 if UseMapper:
     logger.warn("Use NextGenMapper instead of Blastn to fish reads.\nRequire raw reads:")
+
+
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList:
@@ -647,7 +659,9 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 ### Retrieve reads sequences
-                if Species.InputFastaFilename:
+                if SeqtkAvailable and Species.FormatedDatabase:
+                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd_sektk")
+                elif SeqtkAvailable and Species.InputFastaFilename:
                     Species.get_read_sequences(Threads, Memory, meth="seqtk")
                 else:
                     Species.get_read_sequences(Threads, Memory, meth="blastdbcmd")

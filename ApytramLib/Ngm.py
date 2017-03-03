@@ -48,10 +48,15 @@ class Ngm(object):
 
         self.sensitivity = None      # --threads
         self.threads = 1          # --sensitivity
-        self.min_identity = 0     #-i/--min-identity
-        self.min_residues = 0     #-R/--min-residues
-        self.min_mq = 0           #-Q/--min-mq
+        self.min_identity = None     #-i/--min-identity
+        self.min_residues = None     #-R/--min-residues
+        self.min_mq = None           #-Q/--min-mq
         self.fast_pairing = False # --fast-pairing
+
+        self.kmer      = None     #--kmer
+        self.kmer_skip = None     #--kmer-skip
+        self.kmer_min  = None     #--kmer-min
+
 
 
         self.no_unal = True        #--no-unal
@@ -67,12 +72,18 @@ class Ngm(object):
             command.extend(["-t", str(self.threads)])
         if self.sensitivity != None:
             command.extend(["--sensitivity", str(self.sensitivity)])
-        if self.min_identity != 0:
+        if self.min_identity != None:
             command.extend(["--min-identity", str(self.min_identity)])
-        if self.min_residues != 0:
+        if self.min_residues != None:
             command.extend(["--min-residues", str(self.min_residues)])
-        if self.min_mq != 0:
+        if self.min_mq != None:
             command.extend(["--min-mq", str(self.min_mq)])
+        if self.kmer != None:
+            command.extend(["--kmer", str(self.kmer)])
+        if self.kmer_skip != None:
+            command.extend(["--kmer-skip", str(self.kmer_skip)])
+        if self.kmer_min != None:
+            command.extend(["--kmer-min", str(self.kmer_min)])
         if self.no_unal:
             command.extend(["--no-unal"])
 
@@ -90,7 +101,7 @@ class Ngm(object):
             # mapping via ngm
             p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             # sam to fasta
-            p1 = subprocess.Popen(["awk", """{OFS="\\t"; gsub("XR:i:","", $18) ;  if (( $1 !~ /^@/ ) && (($18+0) > 30))  {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %self.output_fasta ], stdin=p.stdout, stdout = subprocess.PIPE)
+            p1 = subprocess.Popen(["awk", """{OFS="\\t"; gsub("XR:i:","", $18) ;  if (( $1 !~ /^@/ ) && (($18+0) > 30))  {print ">" $1 "\\n" $10 > "%s"; print $1} }""" %(self.output_fasta) ], stdin=p.stdout, stdout = subprocess.PIPE)
             with open(self.output_readnames, 'w') as OUTPUTFILE:
                 p2 = subprocess.Popen(["sort", "-u"], stdin=p1.stdout, stdout = OUTPUTFILE)
 

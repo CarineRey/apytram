@@ -368,14 +368,19 @@ class RNA_species(object):
         start = time.time()
         self.logger.info("Map reads (%s) on bait sequences", self.InputFastaFilename)
         NgmProcess = Ngm.Ngm(BaitSequencesFilename, self.InputFastaFilename, output_readnames=self.ReadNamesFilename, output_fasta=self.ReadNamesFilename+".fasta")
-        NgmProcess.sensitivity = 1
+        NgmProcess.sensitivity = 0
+
+        NgmProcess.kmer      = 10    #--kmer
+        NgmProcess.kmer_skip = 0     #--kmer-skip
+        NgmProcess.kmer_min  = 1     #--kmer-min
+
         if self.CurrentIteration == 1: # first iteration bait sequence can be divergente
-            NgmProcess.min_identity = 0.75    #-i/--min-identity
-            NgmProcess.min_residues = 0.70    #-R/--min-residues
+            NgmProcess.min_identity = 0.75
+            NgmProcess.min_residues = 0.30
         else: # other iteration -> less authorized divergente because same species
-            NgmProcess.min_identity = 0.95     #-i/--min-identity
-            NgmProcess.min_residues = 0.30    #-R/--min-residues
-        NgmProcess.min_mq = 0
+            NgmProcess.min_identity = 0.75
+            NgmProcess.min_residues = 0.30
+
         NgmProcess.threads = Threads
 
         (out,err) = NgmProcess.launch()
@@ -405,6 +410,70 @@ class RNA_species(object):
                     (out,err) = BlastdbcmdProcess.launch()
                     self.add_time_statistic("Blastdbcmd", start = start)
                     self.logger.debug("Blastdbcmd %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
+                elif meth == "blastdbcmd_sektk":
+
+                    NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    CommonReadNamesFilename = "%s/CommonReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    PreviousReadNamesFilename = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration-1,strand)
+                    PreviousReadFastaFilename = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration-1,strand)
+
+                    #CommonReadNamesFilename = Get read in ReadNamesFilename and in PreviousReadNamesFilename
+                    Nb_common_reads = ApytramNeeds.common_reads(PreviousReadNamesFilename, ReadNamesFilename, CommonReadNamesFilename)
+
+                    if not os.path.isfile(self.ReadNamesFilename+".fasta"):
+                        Nb_new_reads_ngm = 0
+                        #NewReadNamesFilename = Get read in ReadNamesFilename and not in CommonReadNamesFilename
+                        (Nb_new_reads, NewReadNamesFilename) = ApytramNeeds.new_reads(CommonReadNamesFilename, ReadNamesFilename, NewReadNamesFilename)
+                    else:
+                        #NewNgmReadNamesFilename = Get read in ReadNamesFilename but not in self.ReadNamesFilename
+                        (Nb_new_reads_ngm, NewNgmReadNamesFilename) = ApytramNeeds.new_reads(CommonReadNamesFilename, self.ReadNamesFilename, NewNgmReadNamesFilename)
+                        #NewReadNamesFilename = Get read in ReadNamesFilename but not in CommonReadNamesFilename and in NewNgmReadNamesFilename and check strand
+                        ngm_reads = []
+                        com_reads = []
+                        reads = []
+                        if Nb_new_reads_ngm:
+                            if os.path.isfile(NewNgmReadNamesFilename):
+                                ngm_file = NewNgmReadNamesFilename
+                            else:
+                                ngm_file = self.ReadNamesFilename
+                            with open(ngm_file, "r") as NGMREADSFILE:
+                                ngm_reads = NGMREADSFILE.read().strip().split("\n")
+                                # filter for reads of this strand
+                                if strand:
+                                    ngm_reads = [ r for r in ngm_reads if re.search("%s$" %strand.replace(".",""), r)]
+                        if Nb_common_reads:
+                            with open(CommonReadNamesFilename, "r") as COMREADSFILE:
+                                com_reads = COMREADSFILE.read().strip().split("\n")
+                        if os.path.isfile(ReadNamesFilename):
+                            with open(ReadNamesFilename, "r") as READSFILE:
+                                reads = READSFILE.read().strip().split("\n")
+                        ngm_com_reads = set(ngm_reads + com_reads)
+                        new_reads = [ r for r in reads if not r in ngm_com_reads ]
+                        Nb_new_reads = len(new_reads)
+                        if Nb_new_reads:
+                            with open(NewReadNamesFilename, "w") as NEWREADSFILE:
+                                NEWREADSFILE.write("\n".join(new_reads)+"\n")
+
+                    if Nb_new_reads:
+                        BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, NewReadNamesFilename, ReadFastaFilename)
+                        self.logger.debug("Add %s new reads (get from DB)" %(Nb_new_reads))
+                        (out,err) = BlastdbcmdProcess.launch()
+
+                    if Nb_common_reads:
+                        SeqtkProcess = Seqtk.Seqtk(fasta=PreviousReadFastaFilename)
+                        self.logger.debug("Add %s old reads (get from previous iteration)" %(Nb_common_reads))
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(CommonReadNamesFilename, ReadFastaFilename, mode="a")
+
+                    if Nb_new_reads_ngm and os.path.isfile(self.ReadNamesFilename+".fasta"):
+                        # Get fasta seq for read fish via ngm
+                        self.logger.debug("Add %s new reads (get from ngm output)" %(Nb_new_reads_ngm))
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.ReadNamesFilename+".fasta")
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(NewNgmReadNamesFilename, ReadFastaFilename, mode="a")
+
+                    self.add_time_statistic("Blastdbcmd", start = start)
+                    self.logger.debug("Blastdbcmd Seqtk %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
+
                 else:
                     if os.path.isfile(self.ReadNamesFilename+".fasta"):
                         # Get fasta seq for read fish via ngm
@@ -413,12 +482,12 @@ class RNA_species(object):
 
                         # Add fasta seq for read not fish via ngm (paired read)
                         SeqtkProcess = Seqtk.Seqtk(fasta=self.InputFastaFilename)
-                        NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                        NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
                         ## That means present in ReadNamesFilename but not in self.ReadNamesFilename
-                        Nb_added_reads = ApytramNeeds.new_reads(self.ReadNamesFilename, ReadNamesFilename, NewReadNamesFilename)
+                        (Nb_added_reads, NewNgmReadNamesFilename)  = ApytramNeeds.new_reads(self.ReadNamesFilename, ReadNamesFilename, NewNgmReadNamesFilename)
                         if Nb_added_reads:
                             self.logger.debug("Add %s new reads" %(Nb_added_reads))
-                            (out,err) = SeqtkProcess.launch_fasta_subseq(NewReadNamesFilename, ReadFastaFilename, mode="a")
+                            (out,err) = SeqtkProcess.launch_fasta_subseq(NewNgmReadNamesFilename, ReadFastaFilename, mode="a")
 
 
                         self.add_time_statistic("Seqtk", start = start)

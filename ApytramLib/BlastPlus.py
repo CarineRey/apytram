@@ -122,15 +122,25 @@ class Blastdbcmd(object):
         self.OutputFile = OutputFile
         self.Dbtype = "nucl"
 
-    def launch(self):
+    def launch(self, mode="w"):
         command = ["blastdbcmd", "-db", self.Database, "-entry_batch",
-                   self.InputFile, "-dbtype", self.Dbtype,
-                   "-out", self.OutputFile]
-        self.logger.debug(" ".join(command))
-        p = subprocess.Popen(command,
+                   self.InputFile, "-dbtype", self.Dbtype]
+        if mode=="a":
+            self.logger.debug(" ".join(command))
+            with open(self.OutputFile, "a") as OUTPUTFILE:
+                        p = subprocess.Popen(command,
+                             stdout=OUTPUTFILE,
+                             stderr=subprocess.PIPE)
+            (out, err) = p.communicate()
+
+        elif mode=="w":
+            command.extend(["-out", self.OutputFile])
+            self.logger.debug(" ".join(command))
+            p = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-        (out, err) = p.communicate()
+            (out, err) = p.communicate()
+
         if err:
             self.logger.error(err)
         return (out, err)
