@@ -220,6 +220,24 @@ class Fasta(object):
         write_in_file(str(self), OutFastaFile)
 
 
+def search(program):
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
 def end(exit_code, TmpDirName, keep_tmp = False, logger=""):
     "Functions to end apytram in removing temporary directory"
     ### Remove tempdir if the option --tmp have not been use
@@ -435,14 +453,27 @@ def number_new_reads(FileOld, FileNew, nb_intial=0):
         Nb = nb_intial
     return Nb
 
-def new_reads(FileOld, FileNew, DiffFile):
+def new_reads(FileOld, FileNew, DiffFile,f=""):
     if os.path.isfile(FileNew) and os.path.isfile(FileOld):
         command1 = "join -v 2 %s %s" %(FileOld, FileNew)
         with open(DiffFile, "w") as OUTPUTFILE:
             p1 = subprocess.Popen(command1.split(),
                              stdout=OUTPUTFILE)
         (out, err) = p1.communicate()
-        return(count_lines(DiffFile))
+        return(count_lines(DiffFile), DiffFile)
+    elif os.path.isfile(FileNew):
+        return(count_lines(FileNew), FileNew)
+    else:
+        return(0, "")
+
+def common_reads(File1, File2, CommonFile):
+    if os.path.isfile(File1) and os.path.isfile(File2):
+        command1 = "join %s %s" %(File1, File2)
+        with open(CommonFile, "w") as OUTPUTFILE:
+            p1 = subprocess.Popen(command1.split(),
+                             stdout=OUTPUTFILE)
+        (out, err) = p1.communicate()
+        return(count_lines(CommonFile))
     else:
         return(0)
 
