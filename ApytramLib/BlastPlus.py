@@ -54,7 +54,7 @@ class Makeblastdb(object):
                    "-out", os.path.abspath(self.OutputFiles),
                    "-dbtype", self.Dbtype]
         if self.IndexedDatabase:
-            command.append("-parse_seqids")
+            command.extend(["-hash_index","-parse_seqids"])
 
         self.logger.debug(" ".join(command))
         p = subprocess.Popen(command,
