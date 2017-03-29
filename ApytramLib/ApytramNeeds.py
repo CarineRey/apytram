@@ -87,6 +87,9 @@ class Sequence(object):
     def __str__(self):
         return(">" + self.Name + "\n" + '\n'.join(self.Sequence[i:i+60] for i in range(0, len(self.Sequence), 60)) + "\n")
 
+    def __len__(self):
+        return len(self.Sequence)
+
     def copy(self):
         ns = Sequence()
 
@@ -195,6 +198,20 @@ class Fasta(object):
             DealignedFasta.append(s)
         return DealignedFasta
 
+    def isalign(self):
+        len_s = []
+        gap_s = []
+        isalign = False
+        for s in self.Sequences:
+            len_s.append(len(s))
+            if len_s and len(s) != len_s[0]:
+                break
+            elif re.search("-",s.Sequence):
+                gap_s.append(True)
+        if len(set(len_s)) == 1 and gap_s:
+            isalign = True
+        return isalign
+
     def complete_fasta(self,NewInfoFasta):
         assert isinstance(NewInfoFasta, Fasta), "NewInfoFasta must belong to the Fasta class"
         for i in range(len(self.Sequences)):
@@ -301,7 +318,7 @@ def write_in_file(String,Filename,mode = "w"):
             File.write(String)
 
 def add_paired_read_names(File, NewFile, logger = ""):
-    "Add paired read name to a read name list"
+    "Add paired read names to a read name list"
     if os.path.isfile(File):
         command1 = ["awk", """{ print $0; if (match($0,"1$")) sub("1$",2,$0); else if (match($0,"2$")) sub("2$",1,$0); print $0}""", File]
         command2 = "sort -u -o %s" %(NewFile)
@@ -476,6 +493,42 @@ def common_reads(File1, File2, CommonFile):
         return(count_lines(CommonFile))
     else:
         return(0)
+
+
+def get_seq(id, DB):
+    try:
+        return DB.get_raw(id)
+    except KeyError:
+        return ""
+
+def retrieve_reads_from_index(DB, ReadsNamesFile, OutputFile):
+    reads_file = open(ReadsNamesFile, "r")
+    reads = reads_file.read().strip().split("\n")
+    reads_file.close()
+    res=[]
+    for r in reads:
+        res.append(get_seq(r, DB))
+    with open(OutputFile, "w") as FILE:
+        FILE.write("".join(res))
+    return(len(res))
+
+def get_read_from_cluster(rep, DB):
+    try:
+        cluster = DB.get_raw(rep)
+        return ([rep] + cluster.split("\n")[1].split(";"))
+    except KeyError:
+        return [rep]
+
+def retrieve_reads_from_cluster(DB, ReadsNamesFile, OutputFile):
+    reads_file = open(ReadsNamesFile, "r")
+    reads = reads_file.read().strip().split("\n")
+    reads_file.close()
+    res=[]
+    for r in reads:
+        res.extend(get_read_from_cluster(r, DB))
+    with open(OutputFile, "w") as FILE:
+        FILE.write("\n".join(res))
+    return(len(res))
 
 def check_almost_identical_exonerate_results(ExonerateResult):
     "Return True if all hit have a hit with 99% > id and a len = 98% len query "
