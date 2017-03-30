@@ -713,7 +713,10 @@ for Species in SpeciesList:
         if os.path.isfile(Species.IndexFilename):
            start_index = time.time()
            Species.IndexDB = SeqIO.index_db(Species.IndexFilename)
-           logger.warn("\t-%s ...  (already indexed) %i sequences (%s seconds)" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
+           if args.debug:
+               logger.warn("\t-%s ...  (fasta already indexed) %i sequences (%s seconds)" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
+           else:
+               logger.warn("\t-%s ...  (fasta already indexed)", Species.Species)               
            Species.IndexDB.close()
            for fasta_file in Species.IndexDB._filenames:
                if not os.path.isfile(fasta_file):
@@ -723,7 +726,7 @@ for Species in SpeciesList:
            start_index = time.time()
            logger.warn("Build index (%s) from %s for %s", Species.IndexFilename, Species.InputFastaFilename, Species.Species)
            Species.IndexDB = SeqIO.index_db(Species.IndexFilename, Species.InputFastaFilename, "fasta")
-           logger.warn("\t-%s ...  indexed %i sequences (%s seconds)" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
+           logger.warn("\t-%s ...  fasta indexed", Species.Species)
            if args.debug:
                logger.warn("\t-%s ... %i sequences indexed in %s seconds" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
            Species.IndexDB.close()
@@ -732,7 +735,10 @@ for Species in SpeciesList:
         if os.path.isfile(Species.ClstrIndexFilename):
             start_index = time.time()
             Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename)
-            logger.warn("\t-%s ...  (already indexed) %i cluster (%s seconds)" %(Species.Species, len(Species.ClstrIndexDB), time.time() - start_index))
+            if args.debug:
+                logger.warn("\t-%s ...  (cluster already indexed) %i cluster (%s seconds)", Species.Species, len(Species.ClstrIndexDB), time.time() - start_index)
+            else:
+                logger.warn("\t-%s ...  (cluster already indexed)", Species.Species)
             Species.ClstrIndexDB.close()
             for clstr_file in Species.ClstrIndexDB._filenames:
                if not os.path.isfile(clstr_file):
@@ -744,7 +750,7 @@ for Species in SpeciesList:
            start_index = time.time()
            logger.warn("Build index (%s) from %s for %s", Species.ClstrIndexFilename, Species.ClstrFilename, Species.Species)
            Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename, Species.ClstrFilename, "fasta")
-           logger.warn("\t-%s ...  indexed %i cluster (%s seconds)" %(Species.Species, len(Species.ClstrIndexDB), time.time() - start_index))
+           logger.warn("\t-%s ...  cluster indexed", Species.Species)
            if args.debug:
                logger.warn("\t-%s ... %i cluster indexed in %s seconds" %(Species.Species, len(Species.ClstrIndexDB), time.time() - start_index))
            Species.ClstrIndexDB.close()
@@ -803,25 +809,32 @@ for Query in QueriesList:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 
                 start_time_enrich_read_list = time.time()
+                logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
                 if Species.ClstrIndexDB:
                     # Get reads names from read clusters
-                    logger.info("Get reads names from read clusters")
+                    logger.info("Remove duplicated names")
                     logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
                     ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, Species.ReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
                     logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
+
+                    logger.info("Get reads names from read clusters")
                     ApytramLib.ApytramNeeds.retrieve_reads_from_cluster(Species.ClstrIndexDB, Species.ReadNamesFilename, Species.ReadNamesFilename)
                     logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
 
                 if Species.PairedData:
                     # Get paired reads names and remove duplicated names
                     logger.info("Get paired reads names and remove duplicated names")
                     ApytramLib.ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename))
                 else:
                     # Remove duplicated names
                     logger.info("Remove duplicated names")
                     ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename))
 
-                logger.warn("%s second", str(time.time() - start_time_enrich_read_list))
+                logger.info("%s second to retrieve all read names", str(time.time() - start_time_enrich_read_list))
                 # Count the number of reads which will be used in the Trinity assembly
                 logger.info("Count the number of reads")
                 Species.ReadsNumber = ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename)
@@ -883,7 +896,6 @@ for Query in QueriesList:
                             logger.warning("No sequence has passed the iteration filter at the iteration %s for %s", Species.CurrentIteration, Species.Species)
                             Species.Improvment = False
                             Species.CompletedIteration = False
-
                         else:
                             ### Compare sequences of the current iteration to those of the previous iteration
                             logger.info("Compare results with the previous iteration")
@@ -898,30 +910,29 @@ for Query in QueriesList:
                                 Species.compare_current_and_previous_iterations()
 
                             # Check that the coverage has increased compared to the previous iteration
+                            if RequiredCoverage <=100:
+                                if Species.CompletedIteration:
+                                    logger.info("Check that the coverage has increased compared to the previous iteration")
+                                    Species.measure_coverage(Query)
+                                    # Stop iteration if both Largecoverage and Total length are not improved
+                                    ##if Species.get_iter_statistic("AverageLength") != Species.get_iter_statistic("AverageLength", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("AverageScore") != Species.get_iter_statistic("AverageScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("TotalLength") != Species.get_iter_statistic("TotalLength", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("TotalScore") != Species.get_iter_statistic("TotalScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("BestScore") != Species.get_iter_statistic("BestScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter=-1):
+                                    ##    logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
+                                    ##    Species.Improvment = False
 
-                            logger.info("Check that the coverage has inscreased compared to the previous iteration")
-                            Species.measure_coverage(Query)
-
-                            if Species.CompletedIteration:
-                                # Stop iteration if both Largecoverage and Total length are not improved
-                                if Species.get_iter_statistic("AverageLength") != Species.get_iter_statistic("AverageLength", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("AverageScore") != Species.get_iter_statistic("AverageScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("TotalLength") != Species.get_iter_statistic("TotalLength", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("TotalScore") != Species.get_iter_statistic("TotalScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("BestScore") != Species.get_iter_statistic("BestScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter=-1):
-                                    logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
-                                    Species.Improvment = False
-
-                                # Stop iteration if the RequiredCoverage is reached
-                                if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
-                                    logger.info("This iteration attains the required bait sequence coverage (%d >= %d)", Species.get_iter_statistic("StrictCoverage"), RequiredCoverage)
-                                    Species.Improvment = False
+                                    # Stop iteration if the RequiredCoverage is reached
+                                    if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
+                                        logger.info("This iteration attains the required bait sequence coverage (%d >= %d)", Species.get_iter_statistic("StrictCoverage"), RequiredCoverage)
+                                        Species.Improvment = False
 
 
                             ### Write a fasta file for this iteration if the option --keep_iterations was selected

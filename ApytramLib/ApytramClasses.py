@@ -801,6 +801,8 @@ class RNA_species(object):
         self.logger.debug("Exonerate_2 --- %s seconds ---" %(self.get_time_statistic("Exonerate_2")))
 
     def measure_coverage(self,Query):
+        if not Query.Aligned:
+            Query.align_query()
         # Use Mafft
         start = time.time()
         MafftProcess = Aligner.Mafft(Query.AlignedQuery)
@@ -931,7 +933,7 @@ class Query(object):
         self.ReferenceNames = QueryFasta.Names
 
         self.AlignedQuery = ""
-
+        self.Aligned = False
 
         self.CumulIteration = 0
         self.AbsIteration = 0
@@ -948,11 +950,29 @@ class Query(object):
         self.IterStatsDictList = []
 
     def initialization(self):
+        #remove - in sequences
+        self.logger.debug("Remove - in %s" ,self.RawQuery)
+        query = ApytramNeeds.Fasta()
+        query.read_fasta(FastaFilename=self.RawQuery)
+        query.dealign_fasta()
+        self.RawQuery = "%s/References.nogap.fasta" %(self.TmpDirName)
+        query.write_fasta(self.RawQuery)
+            # # If the -pep option is used, the -q option must be precised
+            # if args.query_pep:
+            #   if not os.path.isfile(args.query_pep):
+            #        logger.error(args.query_pep+" (-pep) is not a file.")
+            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+            #
+            #    if not args.query:
+            #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
+            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+
+    def align_query(self):
         self.AlignedQuery = self.RawQuery
+        self.logger.warn("Align query %s", self.Name)
         if self.SequenceNb != 1:
             # If there are multiple probes, align them for the future coverage counter
             # Use Mafft
-
             aligned = ApytramNeeds.Fasta()
             aligned.read_fasta(FastaFilename=self.AlignedQuery)
             if not aligned.isalign():
@@ -966,27 +986,9 @@ class Query(object):
                 ApytramNeeds.write_in_file(MafftResult, self.AlignedQuery)
                 self.logger.debug("mafft --- %s seconds ---", str(time.time() - start_mafft_time))
             else:
-                self.logger.debug("%s is already aligned, use it", self.RawQuery)
-
-        #remove - in sequences
-
-        self.logger.debug("Remove - in %s" ,self.RawQuery)
-        query = ApytramNeeds.Fasta()
-        query.read_fasta(FastaFilename=self.RawQuery)
-        query.dealign_fasta()
-        self.RawQuery = "%s/References.nogap.fasta" %(self.TmpDirName)
-        query.write_fasta(self.RawQuery)
-
-            # # If the -pep option is used, the -q option must be precised
-            # if args.query_pep:
-            #   if not os.path.isfile(args.query_pep):
-            #        logger.error(args.query_pep+" (-pep) is not a file.")
-            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
-            #
-            #    if not args.query:
-            #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
-            #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
-
+                self.logger.warn("%s is already aligned, use it", self.RawQuery)
+        self.Aligned = True
+        
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
         if NbSpeciesWithoutImprovment == self.NbSpecies:
@@ -1009,6 +1011,8 @@ class Query(object):
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
     def measure_final_coverage(self):
+        if not self.Aligned:
+            self.align_query()
         # Use Mafft
         start = time.time()
         MafftProcess = Aligner.Mafft(self.AlignedQuery)
