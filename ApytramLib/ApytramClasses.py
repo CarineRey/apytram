@@ -354,7 +354,7 @@ class RNA_species(object):
 
         self.TrinityFastaFilename = "%s/Trinity_iter_%d" %(self.TmpDirName,self.CurrentIteration)
 
-        self.TrinityExonerateFilename = "%s/Trinity_iter_%d.exonerate_cdna2g" %(self.TmpDirName,self.CurrentIteration)
+        self.TrinityExonerateFilename = "%s/Trinity_iter_%d.exonerate_al" %(self.TmpDirName,self.CurrentIteration)
 
         self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
@@ -636,7 +636,7 @@ class RNA_species(object):
         TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
         # Keep only the best hit for each contig from Trinity
         TrinityExonerateProcess.Bestn = 1
-        TrinityExonerateProcess.Model = "est2genome" #cdna2genome ##too long !!!
+        TrinityExonerateProcess.Model = "affine:local" #"est2genome" #cdna2genome ##too long !!!
         # Customize the output format
         TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
         (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
@@ -784,7 +784,7 @@ class RNA_species(object):
         ExonerateProcess = Aligner.Exonerate(self.FilteredTrinityFastaFilename, self.PreviousFilteredTrinityFastaFilename)
         # Keep only the best hit for each contigs
         ExonerateProcess.Bestn = 1
-        ExonerateProcess.Model =  "est2genome"
+        ExonerateProcess.Model =  "affine:local"
         # Customize the output format
         ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
         (out,err,ExonerateResult) = ExonerateProcess.get_output()
