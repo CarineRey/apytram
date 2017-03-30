@@ -65,6 +65,17 @@ WORKDIR /opt/seqtk
 RUN make
 ENV PATH /opt/seqtk:$PATH
 
+
+### install cd-hit
+RUN git clone https://github.com/weizhongli/cdhit.git /opt/cdhit/
+WORKDIR /opt/cdhit/cd-hit-auxtools
+RUN make
+ENV PATH /opt/cdhit/cd-hit-auxtools:$PATH
+WORKDIR /opt/cdhit
+RUN make
+RUN make install
+
+
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
