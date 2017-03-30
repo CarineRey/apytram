@@ -636,7 +636,7 @@ class RNA_species(object):
         TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
         # Keep only the best hit for each contig from Trinity
         TrinityExonerateProcess.Bestn = 1
-        TrinityExonerateProcess.Model = "cdna2genome"
+        TrinityExonerateProcess.Model = "est2genome" #cdna2genome ##too long !!!
         # Customize the output format
         TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
         (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
@@ -647,11 +647,11 @@ class RNA_species(object):
             self.logger.info("Reconstructed sequences but no homologous with references")
             self.logger.info("Try to get homologies with a more sensible model")
             ### Try to get homologies with a more sensible model
-            self.TrinityExonerateFile = "%s/Trinity_iter_%d.exonerate_coding2g" %(self.TmpDirName,self.CurrentIteration)
+            self.TrinityExonerateFile = "%s/Trinity_iter_%d.exonerate_ungapped" %(self.TmpDirName,self.CurrentIteration)
             TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
             # Keep only the best hit for each contig from Trinity
             TrinityExonerateProcess.Bestn = 1
-            TrinityExonerateProcess.Model = "coding2genome"
+            TrinityExonerateProcess.Model = "ungapped" #"coding2genome"
             # Customize the output format
             TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
             (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
