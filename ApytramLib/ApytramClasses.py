@@ -428,7 +428,7 @@ class RNA_species(object):
                     (out,err) = BlastdbcmdProcess.launch()
                     self.add_time_statistic("Blastdbcmd", start = start)
                     self.logger.debug("Blastdbcmd %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
-                elif meth == "index_sektk":
+                elif meth == "index_seqtk":
 
                     NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
                     NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
@@ -493,7 +493,7 @@ class RNA_species(object):
                     self.add_time_statistic("index_db", start = start)
                     self.logger.debug("index_db Seqtk (total) %s --- %s seconds ---" %(strand, self.get_time_statistic("index_db")))
 
-                elif meth == "blastdbcmd_sektk":
+                elif meth == "blastdbcmd_seqtk":
 
                     NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
                     NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)

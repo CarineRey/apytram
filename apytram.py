@@ -865,11 +865,11 @@ for Query in QueriesList:
             if Species.Improvment:
                 ### Retrieve reads sequences
                 if SeqtkAvailable and UseIndex and Species.IndexDB:
-                    Species.get_read_sequences(Threads, Memory, meth="index_sektk")
+                    Species.get_read_sequences(Threads, Memory, meth="index_seqtk")
                 elif UseIndex and Species.IndexDB:
                     Species.get_read_sequences(Threads, Memory, meth="index")
                 elif SeqtkAvailable and Species.FormatedDatabase:
-                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd_sektk")
+                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd_seqtk")
                 elif SeqtkAvailable and Species.InputFastaFilename:
                     Species.get_read_sequences(Threads, Memory, meth="seqtk")
                 else:
