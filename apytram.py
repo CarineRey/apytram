@@ -733,7 +733,7 @@ for Species in SpeciesList:
                logger.warn("\t\t ... %i sequences indexed in %s seconds",  len(Species.IndexDB), time.time() - start_index)
            Species.IndexDB.close()
            Species.add_time_statistic("Prep_fasta_index", start = start)
-           Species.logger.info("End Prep fasta index  for %s (%s seconds)", Species.Species , self.get_time_statistic("Prep_fasta_index"))
+           Species.logger.info("End Prep fasta index  for %s (%s seconds)", Species.Species , Species.get_time_statistic("Prep_fasta_index"))
 
     if Species.ClstrIndexFilename and Species.ClstrFilename:
         start_clstr_index = time.time()
@@ -759,7 +759,7 @@ for Species in SpeciesList:
            Species.ClstrIndexDB.close()
 
         Species.add_time_statistic("Prep_clstr_index", start = start_clstr_index)
-        Species.logger.info("End Prep clstr_index  for %s (%s seconds)", Species.Species , self.get_time_statistic("Prep_clstr_index"))
+        Species.logger.info("End Prep clstr_index  for %s (%s seconds)", Species.Species , Species.get_time_statistic("Prep_clstr_index"))
     logger.warn("\t\t ... Ok")
 
 ### If there is a query continue, else stop
