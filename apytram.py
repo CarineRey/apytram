@@ -677,11 +677,13 @@ if UseMapper or UseIndex:
         logger.warn("Use NextGenMapper instead of Blastn to fish reads.")
     if UseIndex:
         logger.warn("Use index files instead of Blastdbcmd to retrieve reads.")
-    logger.warn("Require raw reads:")
+    logger.warn("Require raw reads for each species.")
 
+logger.warn("Check species")
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList:
+    logger.warn("\t-  %s ...", Species.Species)
     Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
 
     if UseIndex and not Species.IndexFilename:
@@ -695,28 +697,28 @@ for Species in SpeciesList:
     ### If Use mapper, apytram needs raw reads
     if UseMapper or (UseIndex and not os.path.isfile(Species.IndexFilename)):
         if Species.InputFastaFilename:
-            logger.warn("\t-%s ... Raw reads available (%s)",Species.Species, Species.InputFastaFilename)
+            logger.warn("\t\tRaw reads available (%s)", Species.InputFastaFilename)
             pass
         elif Species.Fasta or Species.Fastq:
-            logger.warn("\t-%s ... Raw reads needed. Get it from Input Fasta or Fastq",Species.Species)
+            logger.warn("\t\t ... Raw reads needed. Get it from Input Fasta or Fastq")
             Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
             Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         elif Species.FormatedDatabase:
-            logger.warn("\t-%s ... Raw reads needed. Get it from the database",Species.Species)
+            logger.warn("\t\t ... Raw reads needed. Get it from the database")
             Species.get_all_reads()
 
         if not Species.InputFastaFilename:
-            logger.error("No raw reads available for %s.", Species.Species)
+            logger.error("\t\tNo raw reads available for %s.", Species.Species)
             ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
     if UseIndex:
+        start_index = time.time()
         if os.path.isfile(Species.IndexFilename):
-           start_index = time.time()
            Species.IndexDB = SeqIO.index_db(Species.IndexFilename)
            if args.debug:
-               logger.warn("\t-%s ...  (fasta already indexed) %i sequences (%s seconds)" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
+               logger.warn("\t\t ...  (fasta already indexed) %i sequences (%s seconds)", len(Species.IndexDB), time.time() - start_index)
            else:
-               logger.warn("\t-%s ...  (fasta already indexed)", Species.Species)               
+               logger.warn("\t\t ...  (fasta already indexed)")
            Species.IndexDB.close()
            for fasta_file in Species.IndexDB._filenames:
                if not os.path.isfile(fasta_file):
@@ -726,19 +728,21 @@ for Species in SpeciesList:
            start_index = time.time()
            logger.warn("Build index (%s) from %s for %s", Species.IndexFilename, Species.InputFastaFilename, Species.Species)
            Species.IndexDB = SeqIO.index_db(Species.IndexFilename, Species.InputFastaFilename, "fasta")
-           logger.warn("\t-%s ...  fasta indexed", Species.Species)
+           logger.warn("\t\t ...  fasta indexed")
            if args.debug:
-               logger.warn("\t-%s ... %i sequences indexed in %s seconds" %(Species.Species, len(Species.IndexDB), time.time() - start_index))
+               logger.warn("\t\t ... %i sequences indexed in %s seconds",  len(Species.IndexDB), time.time() - start_index)
            Species.IndexDB.close()
+           Species.add_time_statistic("Prep_fasta_index", start = start)
+           Species.logger.info("End Prep fasta index  for %s (%s seconds)", Species.Species , self.get_time_statistic("Prep_fasta_index"))
 
     if Species.ClstrIndexFilename and Species.ClstrFilename:
+        start_clstr_index = time.time()
         if os.path.isfile(Species.ClstrIndexFilename):
-            start_index = time.time()
             Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename)
             if args.debug:
-                logger.warn("\t-%s ...  (cluster already indexed) %i cluster (%s seconds)", Species.Species, len(Species.ClstrIndexDB), time.time() - start_index)
+                logger.warn("\t\t ...  (cluster already indexed) %i cluster (%s seconds)", len(Species.ClstrIndexDB), time.time() - start_clstr_index)
             else:
-                logger.warn("\t-%s ...  (cluster already indexed)", Species.Species)
+                logger.warn("\t\t ...  (cluster already indexed)")
             Species.ClstrIndexDB.close()
             for clstr_file in Species.ClstrIndexDB._filenames:
                if not os.path.isfile(clstr_file):
@@ -747,13 +751,16 @@ for Species in SpeciesList:
         else:
            if not Species.ClstrIndexFilename:
                Species.ClstrIndexFilename = "%s/%s.clstr.idx" %(Species.TmpDirName, Species.Species)
-           start_index = time.time()
            logger.warn("Build index (%s) from %s for %s", Species.ClstrIndexFilename, Species.ClstrFilename, Species.Species)
            Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename, Species.ClstrFilename, "fasta")
-           logger.warn("\t-%s ...  cluster indexed", Species.Species)
+           logger.warn("\t\t ...  cluster indexed")
            if args.debug:
-               logger.warn("\t-%s ... %i cluster indexed in %s seconds" %(Species.Species, len(Species.ClstrIndexDB), time.time() - start_index))
+               logger.warn("\t\t ... %i cluster indexed in %s seconds", len(Species.ClstrIndexDB), time.time() - start_clstr_index)
            Species.ClstrIndexDB.close()
+
+        Species.add_time_statistic("Prep_clstr_index", start = start_clstr_index)
+        Species.logger.info("End Prep clstr_index  for %s (%s seconds)", Species.Species , self.get_time_statistic("Prep_clstr_index"))
+    logger.warn("\t\t ... Ok")
 
 ### If there is a query continue, else stop
 if not args.query:
