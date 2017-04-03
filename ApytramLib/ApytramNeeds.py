@@ -559,6 +559,12 @@ def create_plot(TimeStatsDictList, IterStatsDictList, SpeciesListNames, OutPrefi
         for i in range(len(TimeStatsDictList)):
 
             TimeStatsDict = TimeStatsDictList[i]
+
+            # remove keys without value
+            for iter_i in TimeStatsDict.keys():
+                for att in TimeStatsDict[iter_i].keys():
+                    if TimeStatsDict[iter_i][att] == 0:
+                        del TimeStatsDict[iter_i][att]
             IterStatsDict = IterStatsDictList[i]
             species = SpeciesListNames[i]
 

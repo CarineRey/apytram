@@ -59,17 +59,21 @@ from matplotlib.backends.backend_pdf import PdfPages
 #### Execution statistics class
 class Exec_stats(object):
     def __init__(self,start_time):
-        New_Time_stat_dic = {"DatabaseBuilding": 0,
-                             "DatabasePreparation": 0,
-                             "Blast": 0,
+        New_Time_stat_dic = {"SPDatabaseBuilding": 0,
+                             "QDatabaseBuilding": 0,
+                             "SPDatabasePreparation": 0,
+                             "Blast_fish": 0,
                              "Ngm": 0,
                              "index_db": 0,
                              "Seqtk": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
-                             "Exonerate_1":0,
-                             "Exonerate_2":0,
+                             "Exonerate_on_ref":0,
+                             "Exonerate_between_iter":0,
+                             "Blast_on_ref":0,
                              "Mafft":0,
+                             "Prep_fasta_index":0,
+                             "Prep_clstr_index":0,
                              "Python":0
                              }
 
@@ -315,8 +319,8 @@ class RNA_species(object):
             self.logger.info("Database %s does not exist" % self.DatabaseName)
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         else:
-            self.add_time_statistic("DatabaseBuilding", start = start)
-            self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
+            self.add_time_statistic("SPDatabaseBuilding", start = start)
+            self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("SPDatabaseBuilding")))
 
     def get_all_reads(self):
          self.InputFastaFilename = "%s/input_fastq.fasta" %(self.TmpDirName)
@@ -375,7 +379,7 @@ class RNA_species(object):
         BlastnProcess.OutFormat = "6 sacc" #qseq
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
-        self.add_time_statistic("Blast", start = start)
+        self.add_time_statistic("Blast_fish", start = start)
         self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
 
     def launch_ngm(self,BaitSequencesFilename,Threads):
@@ -797,8 +801,8 @@ class RNA_species(object):
             self.logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
             self.Improvment = False
 
-        self.add_time_statistic("Exonerate_2", start = start)
-        self.logger.debug("Exonerate_2 --- %s seconds ---" %(self.get_time_statistic("Exonerate_2")))
+        self.add_time_statistic("Exonerate_between_iter", start = start)
+        self.logger.debug("Exonerate_between_iter --- %s seconds ---" %(self.get_time_statistic("Exonerate_between_iter")))
 
     def measure_coverage(self,Query):
         if not Query.Aligned:
@@ -843,15 +847,13 @@ class RNA_species(object):
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["IterationTime"] = iter_time
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["CumulTime"] += iter_time
 
-        NoPythonTime = self.get_time_statistic("Blast") + \
-                       self.get_time_statistic("Blastdbcmd") + \
-                       self.get_time_statistic("Trinity") + \
-                       self.get_time_statistic("Exonerate_1") + \
-                       self.get_time_statistic("Exonerate_2")
+        NoPythonTime = 0
 
+        for key in self.ExecutionStats.TimeStatsDict[self.CurrentIteration]:
+            if key != "Python":
+                NoPythonTime += self.get_time_statistic(key)
 
-        self.TrinityExonerateFilename = ""
-
+        self.HomologyOnRefResult = ""
 
         self.add_time_statistic("Python", inter = NoPythonTime )
         self.logger.debug("Python --- %s seconds ---" %(self.get_time_statistic("Python")))
