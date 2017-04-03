@@ -153,7 +153,7 @@ class RNA_species(object):
         self.ParsedReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
-        self.TrinityExonerateResult = ""
+        self.HomologyOnRefResult = ""
 
         # Constante
 
@@ -358,9 +358,10 @@ class RNA_species(object):
 
         self.TrinityFastaFilename = "%s/Trinity_iter_%d" %(self.TmpDirName,self.CurrentIteration)
 
-        self.TrinityExonerateFilename = "%s/Trinity_iter_%d.exonerate_al" %(self.TmpDirName,self.CurrentIteration)
+        self.HomologyOnRefFilename = "%s/Trinity_iter_%d.blast_on_ref" %(self.TmpDirName,self.CurrentIteration)
+        self.HomologyOnRefResult = ""
 
-        self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
+        self.HomologyBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
     def fish_reads(self, BaitSequencesFilename,Threads, mapper=False):
         if mapper:
@@ -634,39 +635,59 @@ class RNA_species(object):
         self.add_time_statistic("Trinity", start = start)
         self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))
 
-    def get_homology_between_trinity_results_and_references(self,Query):
-        # Use Exonerate
-        start = time.time()
-        TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
-        # Keep only the best hit for each contig from Trinity
-        TrinityExonerateProcess.Bestn = 1
-        TrinityExonerateProcess.Model = "affine:local" #"est2genome" #cdna2genome ##too long !!!
-        # Customize the output format
-        TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
-        (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-        # Write the result in a file
-        if self.TrinityExonerateResult:
-            ApytramNeeds.write_in_file(self.TrinityExonerateResult, self.TrinityExonerateFilename)
-        else:
-            self.logger.info("Reconstructed sequences but no homologous with references")
-            self.logger.info("Try to get homologies with a more sensible model")
-            ### Try to get homologies with a more sensible model
-            self.TrinityExonerateFile = "%s/Trinity_iter_%d.exonerate_ungapped" %(self.TmpDirName,self.CurrentIteration)
+    def get_homology_between_trinity_results_and_references(self,Query, method="blastn"):
+        if method == "exonerate":
+            # Use Exonerate
+            start = time.time()
             TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
             # Keep only the best hit for each contig from Trinity
             TrinityExonerateProcess.Bestn = 1
-            TrinityExonerateProcess.Model = "ungapped" #"coding2genome"
+            TrinityExonerateProcess.Model = "affine:local" #"est2genome" #cdna2genome ##too long !!!
+            self.HomologyOnRefFilename = "%s/Trinity_iter_%d.exonerate_al" %(self.TmpDirName,self.CurrentIteration)
             # Customize the output format
             TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
-            (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
+            (out,err,self.HomologyOnRefResult) = TrinityExonerateProcess.get_output()
             # Write the result in a file
             if self.TrinityExonerateResult:
-                ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)
+                ApytramNeeds.write_in_file(self.TrinityExonerateResult, self.HomologyBetweenIterFilename)
+            else:
+                self.logger.info("Reconstructed sequences but no homologous with references")
+                self.logger.info("Try to get homologies with a more sensible model")
+                ### Try to get homologies with a more sensible model
+                self.HomologyOnRefFilename = "%s/Trinity_iter_%d.exonerate_ungapped" %(self.TmpDirName,self.CurrentIteration)
+                TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
+                # Keep only the best hit for each contig from Trinity
+                TrinityExonerateProcess.Bestn = 1
+                TrinityExonerateProcess.Model = "ungapped" #"coding2genome"
+                # Customize the output format
+                TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
+                (out,err,self.HomologyOnRefResult) = TrinityExonerateProcess.get_output()
+                # Write the result in a file
+                if self.TrinityExonerateResult:
+                    ApytramNeeds.write_in_file(self.HomologyOnRefResult,self.HomologyBetweenIterFilename)
 
-        self.add_time_statistic("Exonerate_1", start = start)
-        self.logger.debug("Exonerate_1 --- %s seconds ---" %(self.get_time_statistic("Exonerate_1")))
+            self.add_time_statistic("Exonerate_on_ref", start = start)
+            self.logger.debug("Exonerate_on_ref --- %s seconds ---" %(self.get_time_statistic("Exonerate_on_ref")))
+        else:
+            # Use Blast
+            start = time.time()
+            BlastnProcess = BlastPlus.Blast( "blastn", Query.QueryDB, self.TrinityFastaFilename)
+            BlastnProcess.Evalue = 1e-5
+            BlastnProcess.Task = "blastn"
+            BlastnProcess.Threads = 1
+            BlastnProcess.max_target_seqs = 1
+            BlastnProcess.OutFormat = "6 sacc qacc qlen length slen sstart send score pident qstart qend "
+            self.HomologyOnRefFilename = "%s/Trinity_iter_%d.blast_on_ref" %(self.TmpDirName,self.CurrentIteration)
 
-    def read_and_parse_exonerate_results(self, final_iteration = False):
+            (out,err) = BlastnProcess.launch(self.HomologyOnRefFilename)
+            self.add_time_statistic("Blast_on_ref", start = start)
+            self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast_on_ref")))
+
+        if os.path.isfile(self.HomologyOnRefFilename) and (os.stat(self.HomologyOnRefFilename).st_size != 0):
+            with open(self.HomologyOnRefFilename, "r") as FILEONREF:
+                self.HomologyOnRefResult = FILEONREF.read()
+
+    def read_and_parse_homology_results(self, final_iteration = False):
         "Return a list of Sequences if the identity percentage is superior to MinIdentityPercentage and the alignment length is superior to MinAliLen "
 
         if final_iteration:
@@ -685,7 +706,7 @@ class RNA_species(object):
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
         BestScoreNames = {}
 
-        HomologyScoreList = self.TrinityExonerateResult.strip().split("\n")
+        HomologyScoreList = self.HomologyOnRefResult.strip().split("\n")
 
         for line in HomologyScoreList:
             ListLine = line.split("\t")
@@ -754,7 +775,7 @@ class RNA_species(object):
         self.FilteredTrinityFastaFilename = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
 
         # Get and save filtered sequence names and their homology score in self.FilteredTrinityFasta
-        self.read_and_parse_exonerate_results(final_iteration = final_iteration)
+        self.read_and_parse_homology_results(final_iteration = final_iteration)
 
         if self.FilteredTrinityFasta.Sequences: # If sequences pass the filter
             # Read fasta
@@ -793,7 +814,7 @@ class RNA_species(object):
         ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
         (out,err,ExonerateResult) = ExonerateProcess.get_output()
 
-        ApytramNeeds.write_in_file(ExonerateResult,self.ExonerateBetweenIterFilename)
+        ApytramNeeds.write_in_file(ExonerateResult,self.HomologyBetweenIterFilename)
 
         AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
 
@@ -827,8 +848,7 @@ class RNA_species(object):
 
     def tmp_dir_clean_up(TmpDirName,i):
         if i == 1 :
-            FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
-                              "%s/input_fasta.fasta" %TmpDirName]
+            FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName]
         else:
             FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
                             "%s/ReadNames.%d.1.txt" %(TmpDirName,i),
@@ -836,7 +856,7 @@ class RNA_species(object):
                             "%s/Reads.%d.fasta" %(TmpDirName,i),
                             "%s/Reads.%d.1.fasta" %(TmpDirName,i),
                             "%s/Reads.%d.2.fasta" %(TmpDirName,i),
-                            "%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
+                            "%s/Trinity_iter_%d.blast_on_ref" %(TmpDirName,i),
                             "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
                             "%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
                             "%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
@@ -862,14 +882,10 @@ class RNA_species(object):
 
         # Cleaning
         FilesToRemoves = [ self.TrinityFastaFilename,
-                           self.FilteredTrinityFastaFilename
-                         ]
-
-        self.TrinityExonerateFilename = ""
+                           self.FilteredTrinityFastaFilename]
 
         #Build a new tmp dir
         self.set_TmpDir("%s/%s" %(Query.TmpDirName, self.Species))
-
 
         self.ExecutionStats = Exec_stats(time.time())
         self.CurrentIteration = 0
@@ -882,8 +898,9 @@ class RNA_species(object):
         self.ReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
-        self.TrinityExonerateResult = ""
-        self.TrinityExonerateFilename = ""
+        self.HomologyOnRefResult = ""
+        self.HomologyBetweenIterFilename = ""
+        self.HomologyOnRefFilename = ""
 
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
 
@@ -935,6 +952,7 @@ class Query(object):
         self.ReferenceNames = QueryFasta.Names
 
         self.AlignedQuery = ""
+        self.QueryDB = ""
         self.Aligned = False
 
         self.CumulIteration = 0
@@ -958,6 +976,7 @@ class Query(object):
         query.read_fasta(FastaFilename=self.RawQuery)
         query.dealign_fasta()
         self.RawQuery = "%s/References.nogap.fasta" %(self.TmpDirName)
+        self.QueryDB = "%s/References_DB" %(self.TmpDirName)
         query.write_fasta(self.RawQuery)
             # # If the -pep option is used, the -q option must be precised
             # if args.query_pep:
@@ -968,6 +987,10 @@ class Query(object):
             #    if not args.query:
             #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
             #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+                    # Database building
+        self.logger.info(self.QueryDB + " database building")
+        MakeblastdbProcess = BlastPlus.Makeblastdb(self.RawQuery, self.QueryDB)
+        (out,err) = MakeblastdbProcess.launch()
 
     def align_query(self):
         self.AlignedQuery = self.RawQuery
@@ -990,7 +1013,7 @@ class Query(object):
             else:
                 self.logger.warn("%s is already aligned, use it", self.RawQuery)
         self.Aligned = True
-        
+
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
         if NbSpeciesWithoutImprovment == self.NbSpecies:

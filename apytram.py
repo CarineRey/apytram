@@ -887,7 +887,7 @@ for Query in QueriesList:
                     logger.info("Compare Trinity results with query sequences")
                     Species.get_homology_between_trinity_results_and_references(Query)
 
-                    if not Species.TrinityExonerateResult:
+                    if not Species.HomologyOnRefResult:
                         logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
                         Species.Improvment = False
                         Species.CompletedIteration = False
@@ -913,7 +913,7 @@ for Query in QueriesList:
                             if Species.get_iter_statistic("NbContigs") != Species.get_iter_statistic("NbContigs", RelIter=-1):
                                 logger.info("The number of contigs has changed")
                             elif Query.AbsIteration >= 2:
-                                # Use Exonerate to compare the current iteration with the previous
+                                # Use Exonerate/Blast to compare the current iteration with the previous
                                 Species.compare_current_and_previous_iterations()
 
                             # Check that the coverage has increased compared to the previous iteration
