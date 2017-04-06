@@ -59,16 +59,21 @@ from matplotlib.backends.backend_pdf import PdfPages
 #### Execution statistics class
 class Exec_stats(object):
     def __init__(self,start_time):
-        New_Time_stat_dic = {"DatabaseBuilding": 0,
-                             "DatabasePreparation": 0,
-                             "Blast": 0,
+        New_Time_stat_dic = {"SPDatabaseBuilding": 0,
+                             "QDatabaseBuilding": 0,
+                             "SPDatabasePreparation": 0,
+                             "Blast_fish": 0,
                              "Ngm": 0,
+                             "index_db": 0,
                              "Seqtk": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
-                             "Exonerate_1":0,
-                             "Exonerate_2":0,
+                             "Exonerate_on_ref":0,
+                             "Exonerate_between_iter":0,
+                             "Blast_on_ref":0,
                              "Mafft":0,
+                             "Prep_fasta_index":0,
+                             "Prep_clstr_index":0,
                              "Python":0
                              }
 
@@ -114,6 +119,12 @@ class RNA_species(object):
         self.Fasta = []
         self.Fastq = []
         self.InputFastaFilename = ""
+        self.IndexFilename = ""
+        self.IndexDB = None
+        self.ClstrFilename = ""
+        self.ClstrIndexFilename = ""
+        self.ClstrIndexDB = None
+        self.ClstrRepFilename = ""
         self.DatabaseName = ""
         self.DatabaseDirName = ""
         self.FormatedDatabase = False
@@ -142,7 +153,7 @@ class RNA_species(object):
         self.ParsedReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
-        self.TrinityExonerateResult = ""
+        self.HomologyOnRefResult = ""
 
         # Constante
 
@@ -207,7 +218,7 @@ class RNA_species(object):
 
     def prepare_database(self, FreeSpaceTmpDir, TmpDirName):
         start = time.time()
-        self.logger.info("Database %s does not exist for the species: %s" % (self.DatabaseName, self.Species))
+        self.logger.info("Prepare data to build for the species: %s" %(self.Species))
         self.DatabaseDirName = os.path.dirname(self.DatabaseName)
         if os.path.isdir(self.DatabaseDirName) or not self.DatabaseDirName :
             self.logger.info("Database directory exists")
@@ -286,13 +297,20 @@ class RNA_species(object):
 
     def build_database(self, FreeSpaceTmpDir, TmpDirName):
         start = time.time()
-        if not os.path.isfile(self.InputFastaFilename):
+
+        if os.path.isfile(self.ClstrRepFilename):
+            # Database building
+            self.logger.info(self.DatabaseName + " database building")
+            MakeblastdbProcess = BlastPlus.Makeblastdb(self.ClstrRepFilename, self.DatabaseName)
+            (out,err) = MakeblastdbProcess.launch()
+        elif os.path.isfile(self.InputFastaFilename):
+            self.logger.info(self.DatabaseName + " database building")
+            MakeblastdbProcess = BlastPlus.Makeblastdb(self.InputFastaFilename, self.DatabaseName)
+            (out,err) = MakeblastdbProcess.launch()
+        else:
             self.logger.error("Error during concatenation or conversion of input files. %s is not a file" %(self.InputFastaFilename))
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
-        # Database building
-        self.logger.info(self.DatabaseName + " database building")
-        MakeblastdbProcess = BlastPlus.Makeblastdb(self.InputFastaFilename,self.DatabaseName)
-        (out,err) = MakeblastdbProcess.launch()
+
 
         self.FormatedDatabase = self.has_a_formated_database()
 
@@ -301,8 +319,8 @@ class RNA_species(object):
             self.logger.info("Database %s does not exist" % self.DatabaseName)
             ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
         else:
-            self.add_time_statistic("DatabaseBuilding", start = start)
-            self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("DatabaseBuilding")))
+            self.add_time_statistic("SPDatabaseBuilding", start = start)
+            self.logger.info("Database %s build in %s" %(self.DatabaseName,self.get_time_statistic("SPDatabaseBuilding")))
 
     def get_all_reads(self):
          self.InputFastaFilename = "%s/input_fastq.fasta" %(self.TmpDirName)
@@ -340,9 +358,10 @@ class RNA_species(object):
 
         self.TrinityFastaFilename = "%s/Trinity_iter_%d" %(self.TmpDirName,self.CurrentIteration)
 
-        self.TrinityExonerateFilename = "%s/Trinity_iter_%d.exonerate_cdna2g" %(self.TmpDirName,self.CurrentIteration)
+        self.HomologyOnRefFilename = "%s/Trinity_iter_%d.blast_on_ref" %(self.TmpDirName,self.CurrentIteration)
+        self.HomologyOnRefResult = ""
 
-        self.ExonerateBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
+        self.HomologyBetweenIterFilename = "%s/iter_%d_%d" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
     def fish_reads(self, BaitSequencesFilename,Threads, mapper=False):
         if mapper:
@@ -361,7 +380,7 @@ class RNA_species(object):
         BlastnProcess.OutFormat = "6 sacc" #qseq
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
-        self.add_time_statistic("Blast", start = start)
+        self.add_time_statistic("Blast_fish", start = start)
         self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
 
     def launch_ngm(self,BaitSequencesFilename,Threads):
@@ -388,7 +407,6 @@ class RNA_species(object):
         self.logger.info("End Ngm (%s seconds)" %(self.get_time_statistic("Ngm")))
 
     def get_read_sequences(self, Threads, Memory, meth="seqtk"):
-        start = time.time()
         if self.PairedData:
             self.logger.info("Split read names depending on 1/ or 2/")
             (out, err) = ApytramNeeds.split_readnames_in_right_left(self.ParsedReadNamesFilename,self.ReadNamesFilename_Right,self.ReadNamesFilename_Left)
@@ -403,14 +421,84 @@ class RNA_species(object):
         for strand in StrandList:
             ReadFastaFilename = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration,strand)
             ReadNamesFilename = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration,strand)
-
+            start = time.time()
             if (not os.path.isfile(ReadFastaFilename)) or (os.stat(ReadFastaFilename).st_size == 0):
-                if meth == "blastdbcmd":
+                if meth == "index":
+                    nb_reads = ApytramNeeds.retrieve_reads_from_index(self.IndexDB, ReadNamesFilename, ReadFastaFilename)
+                    self.logger.debug("Add %s reads (get from index DB)" %(nb_reads))
+                    self.add_time_statistic("index_db", start = start)
+                    self.logger.debug("index_db %s --- %s seconds ---" %(strand, self.get_time_statistic("index_db")))
+                elif meth == "blastdbcmd":
                     BlastdbcmdProcess = BlastPlus.Blastdbcmd(self.DatabaseName, ReadNamesFilename, ReadFastaFilename)
                     (out,err) = BlastdbcmdProcess.launch()
                     self.add_time_statistic("Blastdbcmd", start = start)
                     self.logger.debug("Blastdbcmd %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
-                elif meth == "blastdbcmd_sektk":
+                elif meth == "index_seqtk":
+
+                    NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    CommonReadNamesFilename = "%s/CommonReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
+                    PreviousReadNamesFilename = "%s/ReadNames.%d%s.txt" % (self.TmpDirName,self.CurrentIteration-1,strand)
+                    PreviousReadFastaFilename = "%s/Reads.%d%s.fasta" %(self.TmpDirName,self.CurrentIteration-1,strand)
+
+                    #CommonReadNamesFilename = Get read in ReadNamesFilename and in PreviousReadNamesFilename
+                    Nb_common_reads = ApytramNeeds.common_reads(PreviousReadNamesFilename, ReadNamesFilename, CommonReadNamesFilename)
+
+                    if not os.path.isfile(self.ReadNamesFilename+".fasta"):
+                        Nb_new_reads_ngm = 0
+                        #NewReadNamesFilename = Get read in ReadNamesFilename and not in CommonReadNamesFilename
+                        (Nb_new_reads, NewReadNamesFilename) = ApytramNeeds.new_reads(CommonReadNamesFilename, ReadNamesFilename, NewReadNamesFilename)
+                    else:
+                        #NewNgmReadNamesFilename = Get read in ReadNamesFilename but not in self.ReadNamesFilename
+                        (Nb_new_reads_ngm, NewNgmReadNamesFilename) = ApytramNeeds.new_reads(CommonReadNamesFilename, self.ReadNamesFilename, NewNgmReadNamesFilename)
+                        #NewReadNamesFilename = Get read in ReadNamesFilename but not in CommonReadNamesFilename and in NewNgmReadNamesFilename and check strand
+                        ngm_reads = []
+                        com_reads = []
+                        reads = []
+                        if Nb_new_reads_ngm:
+                            if os.path.isfile(NewNgmReadNamesFilename):
+                                ngm_file = NewNgmReadNamesFilename
+                            else:
+                                ngm_file = self.ReadNamesFilename
+                            with open(ngm_file, "r") as NGMREADSFILE:
+                                ngm_reads = NGMREADSFILE.read().strip().split("\n")
+                                # filter for reads of this strand
+                                if strand:
+                                    ngm_reads = [ r for r in ngm_reads if re.search("%s$" %strand.replace(".",""), r)]
+                        if Nb_common_reads:
+                            with open(CommonReadNamesFilename, "r") as COMREADSFILE:
+                                com_reads = COMREADSFILE.read().strip().split("\n")
+                        if os.path.isfile(ReadNamesFilename):
+                            with open(ReadNamesFilename, "r") as READSFILE:
+                                reads = READSFILE.read().strip().split("\n")
+                        ngm_com_reads = set(ngm_reads + com_reads)
+                        new_reads = [ r for r in reads if not r in ngm_com_reads ]
+                        Nb_new_reads = len(new_reads)
+                        if Nb_new_reads:
+                            with open(NewReadNamesFilename, "w") as NEWREADSFILE:
+                                NEWREADSFILE.write("\n".join(new_reads)+"\n")
+
+                    if Nb_new_reads:
+                        nb_reads = ApytramNeeds.retrieve_reads_from_index(self.IndexDB, NewReadNamesFilename, ReadFastaFilename)
+                        self.logger.debug("Add %s new reads (get from index DB)" %(nb_reads))
+                        self.add_time_statistic("index_db", start = start)
+                        self.logger.debug("index_db %s --- %s seconds ---" %(strand, self.get_time_statistic("index_db")))
+
+                    if Nb_common_reads:
+                        SeqtkProcess = Seqtk.Seqtk(fasta=PreviousReadFastaFilename)
+                        self.logger.debug("Add %s old reads (get from previous iteration)" %(Nb_common_reads))
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(CommonReadNamesFilename, ReadFastaFilename, mode="a")
+
+                    if Nb_new_reads_ngm and os.path.isfile(self.ReadNamesFilename+".fasta"):
+                        # Get fasta seq for read fish via ngm
+                        self.logger.debug("Add %s new reads (get from ngm output)" %(Nb_new_reads_ngm))
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.ReadNamesFilename+".fasta")
+                        (out,err) = SeqtkProcess.launch_fasta_subseq(NewNgmReadNamesFilename, ReadFastaFilename, mode="a")
+
+                    self.add_time_statistic("index_db", start = start)
+                    self.logger.debug("index_db Seqtk (total) %s --- %s seconds ---" %(strand, self.get_time_statistic("index_db")))
+
+                elif meth == "blastdbcmd_seqtk":
 
                     NewReadNamesFilename = "%s/NewReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
                     NewNgmReadNamesFilename = "%s/NewNgmReads.%d%s.txt" %(self.TmpDirName,self.CurrentIteration, strand)
@@ -472,9 +560,9 @@ class RNA_species(object):
                         (out,err) = SeqtkProcess.launch_fasta_subseq(NewNgmReadNamesFilename, ReadFastaFilename, mode="a")
 
                     self.add_time_statistic("Blastdbcmd", start = start)
-                    self.logger.debug("Blastdbcmd Seqtk %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
+                    self.logger.debug("Blastdbcmd Seqtk (total) %s --- %s seconds ---" %(strand, self.get_time_statistic("Blastdbcmd")))
 
-                else:
+                elif meth == "seqtk":
                     if os.path.isfile(self.ReadNamesFilename+".fasta"):
                         # Get fasta seq for read fish via ngm
                         SeqtkProcess = Seqtk.Seqtk(fasta=self.ReadNamesFilename+".fasta")
@@ -497,6 +585,8 @@ class RNA_species(object):
                         (out,err) = SeqtkProcess.launch_fasta_subseq(ReadNamesFilename, ReadFastaFilename)
                         self.add_time_statistic("Seqtk", start = start)
                         self.logger.debug("Seqtk %s --- %s seconds ---" %(strand, self.get_time_statistic("Seqtk")))
+                else:
+                    self.logger.error("No method to retrieve read")
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
@@ -545,39 +635,59 @@ class RNA_species(object):
         self.add_time_statistic("Trinity", start = start)
         self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))
 
-    def get_homology_between_trinity_results_and_references(self,Query):
-        # Use Exonerate
-        start = time.time()
-        TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
-        # Keep only the best hit for each contig from Trinity
-        TrinityExonerateProcess.Bestn = 1
-        TrinityExonerateProcess.Model = "cdna2genome"
-        # Customize the output format
-        TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
-        (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
-        # Write the result in a file
-        if self.TrinityExonerateResult:
-            ApytramNeeds.write_in_file(self.TrinityExonerateResult, self.TrinityExonerateFilename)
-        else:
-            self.logger.info("Reconstructed sequences but no homologous with references")
-            self.logger.info("Try to get homologies with a more sensible model")
-            ### Try to get homologies with a more sensible model
-            self.TrinityExonerateFile = "%s/Trinity_iter_%d.exonerate_coding2g" %(self.TmpDirName,self.CurrentIteration)
+    def get_homology_between_trinity_results_and_references(self,Query, method="blastn"):
+        if method == "exonerate":
+            # Use Exonerate
+            start = time.time()
             TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
             # Keep only the best hit for each contig from Trinity
             TrinityExonerateProcess.Bestn = 1
-            TrinityExonerateProcess.Model = "coding2genome"
+            TrinityExonerateProcess.Model = "ungapped" #aligned:affine #"est2genome" #cdna2genome ##too long !!!
+            self.HomologyOnRefFilename = "%s/Trinity_iter_%d.exonerate_un" %(self.TmpDirName,self.CurrentIteration)
             # Customize the output format
             TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
-            (out,err,self.TrinityExonerateResult) = TrinityExonerateProcess.get_output()
+            (out,err,self.HomologyOnRefResult) = TrinityExonerateProcess.get_output()
             # Write the result in a file
-            if self.TrinityExonerateResult:
-                ApytramNeeds.write_in_file(self.TrinityExonerateResult,self.TrinityExonerateFilename)
+            if self.HomologyOnRefResult:
+                ApytramNeeds.write_in_file(self.HomologyOnRefResult, self.HomologyBetweenIterFilename)
+            else:
+                self.logger.info("Reconstructed sequences but no homologous with references")
+                self.logger.info("Try to get homologies with a more sensible model")
+                ### Try to get homologies with a more sensible model
+                self.HomologyOnRefFilename =   "%s/Trinity_iter_%d.exonerate_al" %(self.TmpDirName,self.CurrentIteration)
+                TrinityExonerateProcess = Aligner.Exonerate(Query.RawQuery, self.TrinityFastaFilename)
+                # Keep only the best hit for each contig from Trinity
+                TrinityExonerateProcess.Bestn = 1
+                TrinityExonerateProcess.Model = "affine:local" #"coding2genome"
+                # Customize the output format
+                TrinityExonerateProcess.Ryo = self.TrinityExonerateRyo
+                (out,err,self.HomologyOnRefResult) = TrinityExonerateProcess.get_output()
+                # Write the result in a file
+                if self.TrinityExonerateResult:
+                    ApytramNeeds.write_in_file(self.HomologyOnRefResult,self.HomologyBetweenIterFilename)
 
-        self.add_time_statistic("Exonerate_1", start = start)
-        self.logger.debug("Exonerate_1 --- %s seconds ---" %(self.get_time_statistic("Exonerate_1")))
+            self.add_time_statistic("Exonerate_on_ref", start = start)
+            self.logger.debug("Exonerate_on_ref --- %s seconds ---" %(self.get_time_statistic("Exonerate_on_ref")))
+        else:
+            # Use Blast
+            start = time.time()
+            BlastnProcess = BlastPlus.Blast( "blastn", Query.QueryDB, self.TrinityFastaFilename)
+            BlastnProcess.Evalue = 1e-5
+            BlastnProcess.Task = "blastn"
+            BlastnProcess.Threads = 1
+            BlastnProcess.max_target_seqs = 1
+            BlastnProcess.OutFormat = "6 sacc qacc qlen length slen sstart send score pident qstart qend "
+            self.HomologyOnRefFilename = "%s/Trinity_iter_%d.blast_on_ref" %(self.TmpDirName,self.CurrentIteration)
 
-    def read_and_parse_exonerate_results(self, final_iteration = False):
+            (out,err) = BlastnProcess.launch(self.HomologyOnRefFilename)
+            self.add_time_statistic("Blast_on_ref", start = start)
+            self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast_on_ref")))
+
+        if os.path.isfile(self.HomologyOnRefFilename) and (os.stat(self.HomologyOnRefFilename).st_size != 0):
+            with open(self.HomologyOnRefFilename, "r") as FILEONREF:
+                self.HomologyOnRefResult = FILEONREF.read()
+
+    def read_and_parse_homology_results(self, final_iteration = False):
         "Return a list of Sequences if the identity percentage is superior to MinIdentityPercentage and the alignment length is superior to MinAliLen "
 
         if final_iteration:
@@ -596,7 +706,7 @@ class RNA_species(object):
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
         BestScoreNames = {}
 
-        HomologyScoreList = self.TrinityExonerateResult.strip().split("\n")
+        HomologyScoreList = self.HomologyOnRefResult.strip().split("\n")
 
         for line in HomologyScoreList:
             ListLine = line.split("\t")
@@ -665,7 +775,7 @@ class RNA_species(object):
         self.FilteredTrinityFastaFilename = "%s/Trinity_iter_%d.filtered.fasta" %(self.TmpDirName,self.CurrentIteration)
 
         # Get and save filtered sequence names and their homology score in self.FilteredTrinityFasta
-        self.read_and_parse_exonerate_results(final_iteration = final_iteration)
+        self.read_and_parse_homology_results(final_iteration = final_iteration)
 
         if self.FilteredTrinityFasta.Sequences: # If sequences pass the filter
             # Read fasta
@@ -693,29 +803,60 @@ class RNA_species(object):
 
         self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
 
-    def compare_current_and_previous_iterations(self):
+    def compare_current_and_previous_iterations(self, method="blastn"):
         self.logger.info("Refind the \"parent\" contig from the previous contig for each contig and check they are different")
         start = time.time()
-        ExonerateProcess = Aligner.Exonerate(self.FilteredTrinityFastaFilename, self.PreviousFilteredTrinityFastaFilename)
-        # Keep only the best hit for each contigs
-        ExonerateProcess.Bestn = 1
-        ExonerateProcess.Model =  "est2genome"
-        # Customize the output format
-        ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
-        (out,err,ExonerateResult) = ExonerateProcess.get_output()
+        HomologyResult = ""
+        if method == "exonerate":
+            ExonerateProcess = Aligner.Exonerate(self.FilteredTrinityFastaFilename, self.PreviousFilteredTrinityFastaFilename)
+            # Keep only the best hit for each contigs
+            ExonerateProcess.Bestn = 1
+            ExonerateProcess.Model =  "ungapped"
+            # Customize the output format
+            self.HomologyBetweenIterFilename = "%s/iter_%d_%d.exonerate" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
-        ApytramNeeds.write_in_file(ExonerateResult,self.ExonerateBetweenIterFilename)
+            ExonerateProcess.Ryo = "%ti\t%qi\t%ql\t%qal\t%tal\t%tl\t%pi\n"
+            (out,err,HomologyResult) = ExonerateProcess.get_output()
 
-        AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(ExonerateResult)
+            ApytramNeeds.write_in_file(HomologyResult,self.HomologyBetweenIterFilename)
 
+            self.add_time_statistic("Exonerate_between_iter", start = start)
+            self.logger.debug("Exonerate_between_iter --- %s seconds ---" %(self.get_time_statistic("Exonerate_between_iter")))
+
+        else:
+
+            if os.path.isfile(self.TrinityFastaFilename):
+                tmp_DB_name = "%s/Trinity_iter_%d.db" %(self.TmpDirName,(self.CurrentIteration - 1))
+                self.logger.info(tmp_DB_name + " database building")
+                # Build DB
+                MakeblastdbProcess = BlastPlus.Makeblastdb(self.TrinityFastaFilename, tmp_DB_name)
+                (out,err) = MakeblastdbProcess.launch()
+                # Blast ister i on iter i-1
+                BlastnProcess = BlastPlus.Blast( "blastn", tmp_DB_name, self.PreviousFilteredTrinityFastaFilename)
+                BlastnProcess.Evalue = 1e-5
+                BlastnProcess.Task = "blastn"
+                BlastnProcess.Threads = 1
+                BlastnProcess.max_target_seqs = 1
+                BlastnProcess.OutFormat = "6 sacc qacc qlen length length slen pident"
+                self.HomologyBetweenIterFilename = "%s/iter_%d_%d.blast" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
+
+                (out,err) = BlastnProcess.launch(self.HomologyBetweenIterFilename)
+                self.add_time_statistic("Blast_between_iter", start = start)
+                self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast_between_iter")))
+
+                with open(self.HomologyBetweenIterFilename, "r") as BLASTFILE:
+                    HomologyResult = BLASTFILE.read()
+
+        AlmostIdenticalResults = ApytramNeeds.check_almost_identical_exonerate_results(HomologyResult)
         if AlmostIdenticalResults:
             self.logger.info("Contigs are almost identical than the previous iteration (Same size (~98%), > 99% identity)")
             self.Improvment = False
 
-        self.add_time_statistic("Exonerate_2", start = start)
-        self.logger.debug("Exonerate_2 --- %s seconds ---" %(self.get_time_statistic("Exonerate_2")))
+
 
     def measure_coverage(self,Query):
+        if not Query.Aligned:
+            Query.align_query()
         # Use Mafft
         start = time.time()
         MafftProcess = Aligner.Mafft(Query.AlignedQuery)
@@ -736,8 +877,7 @@ class RNA_species(object):
 
     def tmp_dir_clean_up(TmpDirName,i):
         if i == 1 :
-            FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName,
-                              "%s/input_fasta.fasta" %TmpDirName]
+            FilesToRemoves = ["%s/input_fastq.fasta" %TmpDirName]
         else:
             FilesToRemoves = ["%s/ReadNames.%d.txt" %(TmpDirName,i),
                             "%s/ReadNames.%d.1.txt" %(TmpDirName,i),
@@ -745,7 +885,7 @@ class RNA_species(object):
                             "%s/Reads.%d.fasta" %(TmpDirName,i),
                             "%s/Reads.%d.1.fasta" %(TmpDirName,i),
                             "%s/Reads.%d.2.fasta" %(TmpDirName,i),
-                            "%s/Trinity_iter_%d.exonerate_cdna2g" %(TmpDirName,i),
+                            "%s/Trinity_iter_%d.blast_on_ref" %(TmpDirName,i),
                             "%s/Trinity_iter_%d.exonerate_coding2g" % (TmpDirName, i),
                             "%s/Trinity_iter_%d.filtered.fasta" %(TmpDirName,i),
                             "%s/Trinity_iter_%d.Trinity.fasta" %(TmpDirName,i)]
@@ -756,15 +896,13 @@ class RNA_species(object):
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["IterationTime"] = iter_time
         self.ExecutionStats.IterStatsDict[self.CurrentIteration]["CumulTime"] += iter_time
 
-        NoPythonTime = self.get_time_statistic("Blast") + \
-                       self.get_time_statistic("Blastdbcmd") + \
-                       self.get_time_statistic("Trinity") + \
-                       self.get_time_statistic("Exonerate_1") + \
-                       self.get_time_statistic("Exonerate_2")
+        NoPythonTime = 0
 
+        for key in self.ExecutionStats.TimeStatsDict[self.CurrentIteration]:
+            if key != "Python":
+                NoPythonTime += self.get_time_statistic(key)
 
-        self.TrinityExonerateFilename = ""
-
+        self.HomologyOnRefResult = ""
 
         self.add_time_statistic("Python", inter = NoPythonTime )
         self.logger.debug("Python --- %s seconds ---" %(self.get_time_statistic("Python")))
@@ -773,14 +911,10 @@ class RNA_species(object):
 
         # Cleaning
         FilesToRemoves = [ self.TrinityFastaFilename,
-                           self.FilteredTrinityFastaFilename
-                         ]
-
-        self.TrinityExonerateFilename = ""
+                           self.FilteredTrinityFastaFilename]
 
         #Build a new tmp dir
         self.set_TmpDir("%s/%s" %(Query.TmpDirName, self.Species))
-
 
         self.ExecutionStats = Exec_stats(time.time())
         self.CurrentIteration = 0
@@ -793,8 +927,9 @@ class RNA_species(object):
         self.ReadNamesFilename = ""
         self.TrinityFastaFilename = ""
         self.FilteredTrinityFastaFilename = ""
-        self.TrinityExonerateResult = ""
-        self.TrinityExonerateFilename = ""
+        self.HomologyOnRefResult = ""
+        self.HomologyBetweenIterFilename = ""
+        self.HomologyOnRefFilename = ""
 
         self.FilteredTrinityFasta = ApytramNeeds.Fasta()
 
@@ -846,7 +981,8 @@ class Query(object):
         self.ReferenceNames = QueryFasta.Names
 
         self.AlignedQuery = ""
-
+        self.QueryDB = ""
+        self.Aligned = False
 
         self.CumulIteration = 0
         self.AbsIteration = 0
@@ -863,28 +999,14 @@ class Query(object):
         self.IterStatsDictList = []
 
     def initialization(self):
-        self.AlignedQuery = self.RawQuery
-        if self.SequenceNb != 1:
-            # If there are multiple probes, align them for the future coverage counter
-            # Use Mafft
-            start_mafft_time = time.time()
-            MafftProcess = Aligner.Mafft(self.RawQuery)
-            MafftProcess.QuietOption = True
-            MafftProcess.AutoOption = True
-            (MafftResult, err) = MafftProcess.get_output()
-            self.AlignedQuery = "%s/References.ali.fasta" %(self.TmpDirName)
-            ApytramNeeds.write_in_file(MafftResult, self.AlignedQuery)
-            self.logger.debug("mafft --- %s seconds ---", str(time.time() - start_mafft_time))
-
         #remove - in sequences
-
         self.logger.debug("Remove - in %s" ,self.RawQuery)
         query = ApytramNeeds.Fasta()
         query.read_fasta(FastaFilename=self.RawQuery)
         query.dealign_fasta()
         self.RawQuery = "%s/References.nogap.fasta" %(self.TmpDirName)
+        self.QueryDB = "%s/References_DB" %(self.TmpDirName)
         query.write_fasta(self.RawQuery)
-
             # # If the -pep option is used, the -q option must be precised
             # if args.query_pep:
             #   if not os.path.isfile(args.query_pep):
@@ -894,6 +1016,32 @@ class Query(object):
             #    if not args.query:
             #        logger.error("-pep option must be accompanied of the query in nucleotide format (-q option)")
             #        ApytramNeeds.end(1,self.TmpDirName,keep_tmp = self.keep_tmp)
+                    # Database building
+        self.logger.info(self.QueryDB + " database building")
+        MakeblastdbProcess = BlastPlus.Makeblastdb(self.RawQuery, self.QueryDB)
+        (out,err) = MakeblastdbProcess.launch()
+
+    def align_query(self):
+        self.AlignedQuery = self.RawQuery
+        self.logger.warn("Align query %s", self.Name)
+        if self.SequenceNb != 1:
+            # If there are multiple probes, align them for the future coverage counter
+            # Use Mafft
+            aligned = ApytramNeeds.Fasta()
+            aligned.read_fasta(FastaFilename=self.AlignedQuery)
+            if not aligned.isalign():
+                self.logger.debug("%s is not aligned, align it", self.RawQuery)
+                start_mafft_time = time.time()
+                MafftProcess = Aligner.Mafft(self.RawQuery)
+                MafftProcess.QuietOption = True
+                MafftProcess.AutoOption = True
+                (MafftResult, err) = MafftProcess.get_output()
+                self.AlignedQuery = "%s/References.ali.fasta" %(self.TmpDirName)
+                ApytramNeeds.write_in_file(MafftResult, self.AlignedQuery)
+                self.logger.debug("mafft --- %s seconds ---", str(time.time() - start_mafft_time))
+            else:
+                self.logger.warn("%s is already aligned, use it", self.RawQuery)
+        self.Aligned = True
 
     def continue_iter(self):
         NbSpeciesWithoutImprovment = len(self.SpeciesWithoutImprovment[self.AbsIteration])
@@ -917,6 +1065,8 @@ class Query(object):
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
     def measure_final_coverage(self):
+        if not self.Aligned:
+            self.align_query()
         # Use Mafft
         start = time.time()
         MafftProcess = Aligner.Mafft(self.AlignedQuery)

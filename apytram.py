@@ -107,6 +107,14 @@ InUSOptions.add_argument('-fa', '--fasta', type=str,
                    help="Fasta formated RNA-seq data to build the database of reads (only one file).")
 InUSOptions.add_argument('-fq', '--fastq', type=str,
                    help="Fastq formated RNA-seq data to build the database of reads (several space delimited fastq file names are allowed). For paired data, fq must be previously concatenated. WARNING: Paired read names must finished by 1 or 2. (fastq files will be first converted to a fasta file. This process can require some time.)")
+InUSOptions.add_argument('-idx', '--index', type=str,
+                   help="BioPython index.)")
+InUSOptions.add_argument('-clstr', '--clstr', type=str,
+                   help="cluster (pseudo fasta formated).)")
+InUSOptions.add_argument('-clstridx', '--clstridx', type=str,
+                   help="cluster index)")
+InUSOptions.add_argument('-clstr_rep', '--clstr_rep', type=str,
+                   help="cluster representative (fasta).)")
 ##############
 
 ##############
@@ -159,7 +167,6 @@ OutOptions.add_argument('--only_best_file', action='store_true',
 
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
-# comm Marie : tu expliques les détails des stats quelque part?
 OutOptions.add_argument('--plot', action='store_true',
                              help='Create plots to represent the statistics on each iteration. (default: False)')
 OutOptions.add_argument('--plot_ali', action='store_true',
@@ -193,6 +200,9 @@ StopOptions.add_argument('-required_coverage', type=positive_integer,
 StopOptions.add_argument('--finish_all_iter', action='store_true',
                     help="By default, iterations are stop if there is no improvment, if this option is used apytram will finish all iteration (-i).",
                     default=False)
+StopOptions.add_argument('-time_max', type=positive_integer,
+                    help="Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
+                    default=7200)
 
 ##############
 
@@ -219,11 +229,12 @@ MiscellaneousOptions.add_argument('-threads', type=positive_integer,
 MiscellaneousOptions.add_argument('-memory', type=positive_integer,
                     help="Memory available for the assembly in Giga. (Default 1)",
                     default=1)
-MiscellaneousOptions.add_argument('-time_max', type=positive_integer,
-                    help="Do not begin a new iteration if the job duration (in seconds) has exceed this threshold. (Default 7200)",
-                    default=7200)
+
 MiscellaneousOptions.add_argument('--UseMapper', action='store_true',
-                    help="Use NextGenMapper instead of balstn to fish reads",
+                    help="Use NextGenMapper instead of balstn to fish reads (in dev)",
+                    default=False)
+MiscellaneousOptions.add_argument('--UseIndex', action='store_true',
+                    help="Use index_db from BioPython to retrieve reads",
                     default=False)
 MiscellaneousOptions.add_argument('--write_even_empty', action='store_true',
                         default=False,
@@ -308,6 +319,16 @@ if UseMapper and (not ApytramLib.ApytramNeeds.search("ngm")):
         logger.error("ngm not in the PATH !")
         ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
+UseIndex = args.UseIndex
+
+if UseIndex or args.clstr:
+    try:
+        from Bio import SeqIO
+        logger.debug("Biopython available")
+    except ImportError:
+        logger.error("BioPython (Bio.SeqIO) not available, don't use Index")
+        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+
 if MaxIteration < 1:
     logger.error("The number of iteration (-i) must be superior to 0")
     error += 1
@@ -364,7 +385,7 @@ for query in Queries:
         if not name:
             name = os.path.basename(os.path.splitext(query)[0])
         new_query = ApytramLib.ApytramClasses.Query(name, query, logger)
-        new_query.TmpDirName = "%s/%s" %(TmptrinityDirName, name)
+        new_query.TmpDirName = "%s/%s" %(TmpDirName, name)
         QueriesList.append(new_query)
         QueriesNamesList.append(name)
     else:
@@ -418,10 +439,22 @@ for item in args.database_type.split(","):
 
 FAs = []
 FQs = []
+IDXs = []
+CLSTRs = []
+CLSTRIDXs = []
+CLSTR_REPs = []
 if args.fasta:
     FAs += args.fasta.split(",")
 if args.fastq:
     FQs += args.fastq.split(",")
+if args.index:
+    IDXs += args.index.split(",")
+if args.clstr:
+    CLSTRs += args.clstr.split(",")
+if args.clstridx:
+    CLSTRIDXs += args.clstridx.split(",")
+if args.clstr_rep:
+    CLSTR_REPs += args.clstr_rep.split(",")
 
 
 
@@ -476,7 +509,7 @@ for item in DBs:
 for item in FAs:
     f = item.split(":")
     if len(f) == 1 and UniqSpecies_flag:
-        f.append(":SP")
+        f.append("SP")
     if len(f) == 2:
         (fa, species) = f
         if os.path.isfile(fa):
@@ -491,20 +524,114 @@ for item in FAs:
 for item in FQs:
     f = item.split(":")
     if len(f) == 1 and UniqSpecies_flag:
-        f.append(":SP")
+        f.append("SP")
     if len(f) == 2:
         (fq, species) = f
         if os.path.isfile(fq):
             if species in SpeciesNamesList:
                 SpeciesList[SpeciesNamesList.index(species)].Fastq.append(fq)
             else:
-                logger.error("The species associted with %s is %s. But there is no database associated with the species %s.", fq, species, species)
+                logger.error("The species associated with %s is %s. But there is no database associated with the species %s.", fq, species, species)
                 ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
         else:
             logger.error("%s (-fq) is not a file.", fq)
             ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
     else:
         logger.error(""" "%s" must be formatted as "fq_path:species" if you want to use the multispecies option" """, item)
+
+# associate index files with a species
+if UseIndex:
+    logger.debug("Idx: %s" %(IDXs))
+    for item in IDXs:
+        item_idx = item.split(":")
+        if len(item_idx) == 1 and UniqSpecies_flag:
+            item_idx.append("SP")
+        if len(item_idx) == 2:
+            (idx, species) = item_idx
+            if os.path.isfile(idx):
+                if species in SpeciesNamesList:
+                    SpeciesList[SpeciesNamesList.index(species)].IndexFilename = idx
+                    logger.debug("add %s to %s", idx, species)
+                else:
+                    logger.error("The species associated with %s is %s. But there is no species %s.", idx, species, species)
+                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            else:
+                logger.warn("%s (-idx) is not a file. An index will be build for %s", idx, species)
+                SpeciesList[SpeciesNamesList.index(species)].IndexFilename = idx
+                logger.debug("add %s to %s", idx, species)
+        else:
+            logger.error(""" "%s" must be formatted as "index_path:species" if you want to use the multispecies option" """, item)
+
+# associate clstr files with a species
+if args.clstr:
+    logger.debug("Clstr: %s" %(CLSTRs))
+    for item in CLSTRs:
+        item_clstr = item.split(":")
+        if len(item_clstr) == 1 and UniqSpecies_flag:
+            item_clstr.append("SP")
+        if len(item_clstr) == 2:
+            (clstr, species) = item_clstr
+            if os.path.isfile(clstr):
+                if species in SpeciesNamesList:
+                    SpeciesList[SpeciesNamesList.index(species)].ClstrFilename = clstr
+                    logger.debug("add %s to %s", clstr, species)
+                else:
+                    logger.error("The species associated with %s is %s. But there is no species %s.", clstr, species, species)
+                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            else:
+                logger.error("%s (-clstr) is not a file. (%s)", clstr, species)
+                ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        else:
+            logger.error(""" "%s" must be formatted as "clstr_path:species" if you want to use the multispecies option" """, item)
+
+# associate clstridx files with a species
+if args.clstridx:
+    logger.debug("Clstridx: %s" %(CLSTRIDXs))
+    for item in CLSTRIDXs:
+        item_clstridx = item.split(":")
+        if len(item_clstridx) == 1 and UniqSpecies_flag:
+            item_clstridx.append("SP")
+        if len(item_clstridx) == 2:
+            (clstridx, species) = item_clstridx
+            if os.path.isfile(clstridx):
+                if species in SpeciesNamesList:
+                    SpeciesList[SpeciesNamesList.index(species)].ClstrIndexFilename = clstridx
+                    logger.debug("add %s to %s", clstridx, species)
+                else:
+                    logger.error("The species associated with %s is %s. But there is no species %s.", clstridx, species, species)
+                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            elif os.path.isfile(SpeciesList[SpeciesNamesList.index(species)].ClstrFilename):
+                logger.warn("%s (-clstridx) is not a file. An clstr index will be build for %s", clstridx, species)
+                SpeciesList[SpeciesNamesList.index(species)].ClstrIndexFilename = clstridx
+                logger.debug("add %s to %s", clstridx, species)
+            else:
+                logger.error("%s (-clstridx) is not a file and no -clstr file provided for %s", clstr, species)
+                ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+
+        else:
+            logger.error(""" "%s" must be formatted as "clstr_path:species" if you want to use the multispecies option" """, item)
+
+# associate clstr_rep files with a species
+if args.clstr_rep:
+    logger.debug("Clstr_rep: %s" %(CLSTR_REPs))
+    for item in CLSTR_REPs:
+        item_clstr_rep = item.split(":")
+        if len(item_clstr_rep) == 1 and UniqSpecies_flag:
+            item_clstr_rep.append("SP")
+        if len(item_clstr_rep) == 2:
+            (clstr_rep, species) = item_clstr_rep
+            if os.path.isfile(clstr_rep):
+                if species in SpeciesNamesList:
+                    SpeciesList[SpeciesNamesList.index(species)].ClstrRepFilename = clstr_rep
+                    logger.debug("add %s to %s", clstr_rep, species)
+                else:
+                    logger.error("The species associated with %s is %s. But there is no species %s.", clstr_rep, species, species)
+                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+            else:
+                logger.error("%s (-clstr_rep) is not a file. (%s)", clstr_rep, species)
+                ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        else:
+            logger.error(""" "%s" must be formatted as "clstr_rep_path:species" if you want to use the multispecies option" """, item)
 
 
 #Check all species has a formated database or input fasta/fastq files:
@@ -545,35 +672,95 @@ FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
 
+if UseMapper or UseIndex:
+    if UseMapper:
+        logger.warn("Use NextGenMapper instead of Blastn to fish reads.")
+    if UseIndex:
+        logger.warn("Use index files instead of Blastdbcmd to retrieve reads.")
+    logger.warn("Require raw reads for each species.")
 
-if UseMapper:
-    logger.warn("Use NextGenMapper instead of Blastn to fish reads.\nRequire raw reads:")
-
-
+logger.warn("Check species")
 
 ### Check that there is a database for each species, otherwise build it
 for Species in SpeciesList:
+    logger.warn("\t-  %s ...", Species.Species)
+    Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+
+    if UseIndex and not Species.IndexFilename:
+        Species.IndexFilename = "%s/%s.idx" %(Species.TmpDirName, Species.Species)
+
     if not Species.FormatedDatabase:
-        Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+        logger.info("Database %s does not exist for the species: %s" % (Species.DatabaseName, Species.Species))
         Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
+
     ### If Use mapper, apytram needs raw reads
-    if UseMapper:
+    if UseMapper or (UseIndex and not os.path.isfile(Species.IndexFilename)):
         if Species.InputFastaFilename:
-            logger.warn("\t-%s ... Raw reads available (%s)",Species.Species, Species.InputFastaFilename)
+            logger.warn("\t\tRaw reads available (%s)", Species.InputFastaFilename)
             pass
         elif Species.Fasta or Species.Fastq:
-            logger.warn("\t-%s ... Raw reads needed. Get it from Input Fasta or Fastq",Species.Species)
+            logger.warn("\t\t ... Raw reads needed. Get it from Input Fasta or Fastq")
             Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
             Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         elif Species.FormatedDatabase:
-            logger.warn("\t-%s ... Raw reads needed. Get it from the database",Species.Species)
-            Species.set_TmpDir(TmpDirName + "/db/" + Species.Species)
+            logger.warn("\t\t ... Raw reads needed. Get it from the database")
             Species.get_all_reads()
 
         if not Species.InputFastaFilename:
-            logger.error("No raw reads available for %s.", Species.Species)
+            logger.error("\t\tNo raw reads available for %s.", Species.Species)
             ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+
+    if UseIndex:
+        start_index = time.time()
+        if os.path.isfile(Species.IndexFilename):
+           Species.IndexDB = SeqIO.index_db(Species.IndexFilename)
+           if args.debug:
+               logger.warn("\t\t ...  (fasta already indexed) %i sequences (%s seconds)", len(Species.IndexDB), time.time() - start_index)
+           else:
+               logger.warn("\t\t ...  (fasta already indexed)")
+           Species.IndexDB.close()
+           for fasta_file in Species.IndexDB._filenames:
+               if not os.path.isfile(fasta_file):
+                   logger.error("%s  is not a file. (fasta file associeted with the index %s)", fasta_file)
+                   ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        else:
+           start_index = time.time()
+           logger.warn("Build index (%s) from %s for %s", Species.IndexFilename, Species.InputFastaFilename, Species.Species)
+           Species.IndexDB = SeqIO.index_db(Species.IndexFilename, Species.InputFastaFilename, "fasta")
+           logger.warn("\t\t ...  fasta indexed")
+           if args.debug:
+               logger.warn("\t\t ... %i sequences indexed in %s seconds",  len(Species.IndexDB), time.time() - start_index)
+           Species.IndexDB.close()
+           Species.add_time_statistic("Prep_fasta_index", start = start)
+           Species.logger.info("End Prep fasta index  for %s (%s seconds)", Species.Species , Species.get_time_statistic("Prep_fasta_index"))
+
+    if Species.ClstrIndexFilename and Species.ClstrFilename:
+        start_clstr_index = time.time()
+        if os.path.isfile(Species.ClstrIndexFilename):
+            Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename)
+            if args.debug:
+                logger.warn("\t\t ...  (cluster already indexed) %i cluster (%s seconds)", len(Species.ClstrIndexDB), time.time() - start_clstr_index)
+            else:
+                logger.warn("\t\t ...  (cluster already indexed)")
+            Species.ClstrIndexDB.close()
+            for clstr_file in Species.ClstrIndexDB._filenames:
+               if not os.path.isfile(clstr_file):
+                   logger.error("%s  is not a file. (clstr file associeted with the index %s)", clstr_file)
+                   ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
+        else:
+           if not Species.ClstrIndexFilename:
+               Species.ClstrIndexFilename = "%s/%s.clstr.idx" %(Species.TmpDirName, Species.Species)
+           logger.warn("Build index (%s) from %s for %s", Species.ClstrIndexFilename, Species.ClstrFilename, Species.Species)
+           Species.ClstrIndexDB = SeqIO.index_db(Species.ClstrIndexFilename, Species.ClstrFilename, "fasta")
+           logger.warn("\t\t ...  cluster indexed")
+           if args.debug:
+               logger.warn("\t\t ... %i cluster indexed in %s seconds", len(Species.ClstrIndexDB), time.time() - start_clstr_index)
+           Species.ClstrIndexDB.close()
+
+        Species.add_time_statistic("Prep_clstr_index", start = start_clstr_index)
+        Species.logger.info("End Prep clstr_index  for %s (%s seconds)", Species.Species , Species.get_time_statistic("Prep_clstr_index"))
+    logger.warn("\t\t ... Ok")
 
 ### If there is a query continue, else stop
 if not args.query:
@@ -628,15 +815,33 @@ for Query in QueriesList:
                 else:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 
+                start_time_enrich_read_list = time.time()
+                logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
+                if Species.ClstrIndexDB:
+                    # Get reads names from read clusters
+                    logger.info("Remove duplicated names")
+                    logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
+                    ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, Species.ReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
+                    logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
+
+                    logger.info("Get reads names from read clusters")
+                    ApytramLib.ApytramNeeds.retrieve_reads_from_cluster(Species.ClstrIndexDB, Species.ReadNamesFilename, Species.ReadNamesFilename)
+                    logger.debug("%s reads in %s", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename), Species.ReadNamesFilename)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ReadNamesFilename))
+
                 if Species.PairedData:
                     # Get paired reads names and remove duplicated names
                     logger.info("Get paired reads names and remove duplicated names")
                     ApytramLib.ApytramNeeds.add_paired_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename))
                 else:
                     # Remove duplicated names
                     logger.info("Remove duplicated names")
                     ApytramLib.ApytramNeeds.remove_duplicated_read_names(Species.ReadNamesFilename, Species.ParsedReadNamesFilename, logger)
+                    logger.info("%s reads", ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename))
 
+                logger.info("%s second to retrieve all read names", str(time.time() - start_time_enrich_read_list))
                 # Count the number of reads which will be used in the Trinity assembly
                 logger.info("Count the number of reads")
                 Species.ReadsNumber = ApytramLib.ApytramNeeds.count_lines(Species.ParsedReadNamesFilename)
@@ -659,8 +864,12 @@ for Query in QueriesList:
 
             if Species.Improvment:
                 ### Retrieve reads sequences
-                if SeqtkAvailable and Species.FormatedDatabase:
-                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd_sektk")
+                if SeqtkAvailable and UseIndex and Species.IndexDB:
+                    Species.get_read_sequences(Threads, Memory, meth="index_seqtk")
+                elif UseIndex and Species.IndexDB:
+                    Species.get_read_sequences(Threads, Memory, meth="index")
+                elif SeqtkAvailable and Species.FormatedDatabase:
+                    Species.get_read_sequences(Threads, Memory, meth="blastdbcmd_seqtk")
                 elif SeqtkAvailable and Species.InputFastaFilename:
                     Species.get_read_sequences(Threads, Memory, meth="seqtk")
                 else:
@@ -678,7 +887,7 @@ for Query in QueriesList:
                     logger.info("Compare Trinity results with query sequences")
                     Species.get_homology_between_trinity_results_and_references(Query)
 
-                    if not Species.TrinityExonerateResult:
+                    if not Species.HomologyOnRefResult:
                         logger.info("Reconstructed sequences but no homologous with references (even with the more sensible model)")
                         Species.Improvment = False
                         Species.CompletedIteration = False
@@ -694,7 +903,6 @@ for Query in QueriesList:
                             logger.warning("No sequence has passed the iteration filter at the iteration %s for %s", Species.CurrentIteration, Species.Species)
                             Species.Improvment = False
                             Species.CompletedIteration = False
-
                         else:
                             ### Compare sequences of the current iteration to those of the previous iteration
                             logger.info("Compare results with the previous iteration")
@@ -705,34 +913,33 @@ for Query in QueriesList:
                             if Species.get_iter_statistic("NbContigs") != Species.get_iter_statistic("NbContigs", RelIter=-1):
                                 logger.info("The number of contigs has changed")
                             elif Query.AbsIteration >= 2:
-                                # Use Exonerate to compare the current iteration with the previous
+                                # Use Exonerate/Blast to compare the current iteration with the previous
                                 Species.compare_current_and_previous_iterations()
 
                             # Check that the coverage has increased compared to the previous iteration
+                            if RequiredCoverage <=100:
+                                if Species.CompletedIteration:
+                                    logger.info("Check that the coverage has increased compared to the previous iteration")
+                                    Species.measure_coverage(Query)
+                                    # Stop iteration if both Largecoverage and Total length are not improved
+                                    ##if Species.get_iter_statistic("AverageLength") != Species.get_iter_statistic("AverageLength", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("AverageScore") != Species.get_iter_statistic("AverageScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("TotalLength") != Species.get_iter_statistic("TotalLength", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("TotalScore") != Species.get_iter_statistic("TotalScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("BestScore") != Species.get_iter_statistic("BestScore", RelIter=-1):
+                                    ##    pass
+                                    ##elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter=-1):
+                                    ##    logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
+                                    ##    Species.Improvment = False
 
-                            logger.info("Check that the coverage has inscreased compared to the previous iteration")
-                            Species.measure_coverage(Query)
-
-                            if Species.CompletedIteration:
-                                # Stop iteration if both Largecoverage and Total length are not improved
-                                if Species.get_iter_statistic("AverageLength") != Species.get_iter_statistic("AverageLength", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("AverageScore") != Species.get_iter_statistic("AverageScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("TotalLength") != Species.get_iter_statistic("TotalLength", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("TotalScore") != Species.get_iter_statistic("TotalScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("BestScore") != Species.get_iter_statistic("BestScore", RelIter=-1):
-                                    pass
-                                elif Species.get_iter_statistic("LargeCoverage") != Species.get_iter_statistic("LargeCoverage", RelIter=-1):
-                                    logger.info("This iteration have a large coverage inferior (or equal) to the previous iteration")
-                                    Species.Improvment = False
-
-                                # Stop iteration if the RequiredCoverage is reached
-                                if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
-                                    logger.info("This iteration attains the required bait sequence coverage (%d >= %d)", Species.get_iter_statistic("StrictCoverage"), RequiredCoverage)
-                                    Species.Improvment = False
+                                    # Stop iteration if the RequiredCoverage is reached
+                                    if Species.get_iter_statistic("StrictCoverage") >= RequiredCoverage:
+                                        logger.info("This iteration attains the required bait sequence coverage (%d >= %d)", Species.get_iter_statistic("StrictCoverage"), RequiredCoverage)
+                                        Species.Improvment = False
 
 
                             ### Write a fasta file for this iteration if the option --keep_iterations was selected
