@@ -11,6 +11,7 @@ RUN apt-get install --no-install-recommends  -qy git \
                         python-numpy \
                         python-pandas \
                         python-matplotlib \
+                        python-biopython \
 # to install trinity
                         samtools=0.1.19-1 \
                         zlib1g-dev \
