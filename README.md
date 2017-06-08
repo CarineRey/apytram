@@ -1,4 +1,8 @@
-# apytram
+# Apytram
+
+
+[![DOI](https://zenodo.org/badge/46939363.svg)](https://zenodo.org/badge/latestdoi/46939363)
+
 
 ## Simple command line:
 
