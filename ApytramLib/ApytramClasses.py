@@ -378,6 +378,10 @@ class RNA_species(object):
         BlastnProcess.Task = "blastn"
         BlastnProcess.Threads = Threads
         BlastnProcess.OutFormat = "6 sacc" #qseq
+        if  self.CurrentIteration == 1: # first iteration bait sequence can be divergente
+            BlastnProcess.perc_identity = 85
+        else:
+            BlastnProcess.perc_identity = 97 # other iteration -> less authorized divergente because same species
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast_fish", start = start)
