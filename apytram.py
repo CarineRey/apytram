@@ -850,8 +850,8 @@ for Query in QueriesList:
                     logger.info("Reads from the current iteration are identical to reads from the previous iteration")
                     Species.Improvment = False
                     Species.CompletedIteration = False
-                
-                if NbNewReads > 100 * OldNumberReads:
+
+                if OldNumberReads !=0 and NbNewReads > 100 * OldNumberReads:
                     logger.info("Number of reads has soared -> stop iteration")
                     Species.Improvment = False
                     Species.CompletedIteration = False
