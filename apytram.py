@@ -229,10 +229,6 @@ MiscellaneousOptions.add_argument('-threads', type=positive_integer,
 MiscellaneousOptions.add_argument('-memory', type=positive_integer,
                     help="Memory available for the assembly in Giga. (Default 1)",
                     default=1)
-
-MiscellaneousOptions.add_argument('--UseMapper', action='store_true',
-                    help="Use NextGenMapper instead of balstn to fish reads (in dev)",
-                    default=False)
 MiscellaneousOptions.add_argument('--UseIndex', action='store_true',
                     help="Use index_db from BioPython to retrieve reads",
                     default=False)
@@ -312,12 +308,6 @@ else:
 # Define global parameters
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
-
-UseMapper = args.UseMapper
-
-if UseMapper and (not ApytramLib.ApytramNeeds.search("ngm")):
-        logger.error("ngm not in the PATH !")
-        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 UseIndex = args.UseIndex
 
@@ -672,9 +662,7 @@ FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
 
-if UseMapper or UseIndex:
-    if UseMapper:
-        logger.warn("Use NextGenMapper instead of Blastn to fish reads.")
+if UseIndex:
     if UseIndex:
         logger.warn("Use index files instead of Blastdbcmd to retrieve reads.")
     logger.warn("Require raw reads for each species.")
@@ -694,8 +682,8 @@ for Species in SpeciesList:
         Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
 
-    ### If Use mapper, apytram needs raw reads
-    if UseMapper or (UseIndex and not os.path.isfile(Species.IndexFilename)):
+    ### If Use Index and it not exists, apytram needs raw reads
+    if UseIndex and not os.path.isfile(Species.IndexFilename):
         if Species.InputFastaFilename:
             logger.warn("\t\tRaw reads available (%s)", Species.InputFastaFilename)
             pass
@@ -811,7 +799,7 @@ for Query in QueriesList:
                 ### Blast bait sequences on database of reads
                 # Write read names in ReadNamesFile if the file does not exist
                 if not os.path.isfile(Species.ReadNamesFilename):
-                    Species.fish_reads(Query.BaitSequences, Threads, mapper=UseMapper)
+                    Species.fish_reads(Query.BaitSequences, Threads)
                 else:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 
