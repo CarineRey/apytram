@@ -1,10 +1,11 @@
-FROM debian:jessie
-MAINTAINER Carine Rey carine.rey@ens-lyon.fr
+FROM debian:jessie-slim
+MAINTAINER Carine Rey carine.rey@ens-lyon.org
 
-RUN apt-get clean && apt-get update
+RUN apt-get update
 
 RUN apt-get install --no-install-recommends  -qy git \
                         wget \
+                        cmake \
                         build-essential \
                         mafft \
                         exonerate \
@@ -13,7 +14,6 @@ RUN apt-get install --no-install-recommends  -qy git \
                         python-matplotlib \
                         python-biopython \
 # to install trinity
-                        samtools=0.1.19-1 \
                         zlib1g-dev \
                         ncurses-dev \
 # to install bowtie2
@@ -25,14 +25,14 @@ RUN apt-get install --no-install-recommends  -qy git \
 
 
 ### install openjdk-8-jre
-RUN echo "deb http://httpredir.debian.org/debian jessie-backports main" >> /etc/apt/sources.list
-RUN apt-get update && apt-get install --no-install-recommends -t jessie-backports -qy ca-certificates-java openjdk-8-jre-headless 
+RUN echo "deb http://httpredir.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && mkdir /usr/share/man/man1 && \
+    apt-get update && apt-get install --no-install-recommends -t jessie-backports -qy ca-certificates-java openjdk-8-jre-headless 
 
-    
-###  install bowtie 2.3
+
+###  install bowtie 2.3.2
 WORKDIR /opt
-RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.0/bowtie2-2.3.0-source.zip &&\
-    unzip bowtie2-2.3.0-source.zip && cd bowtie2-2.3.0/ && make && make install
+RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-source.zip &&\
+    unzip bowtie2-2.3.2-source.zip && cd bowtie2-2.3.2/ && make && make install
 
 
 ###  install ncbi-blast+=2.6.0
@@ -44,44 +44,27 @@ ENV PATH /opt/ncbi-blast-2.6.0+/bin/:$PATH
 
 ### install Trinity
 WORKDIR /opt
-RUN wget https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v2.3.2.tar.gz && \
-     tar zxf Trinity-v2.3.2.tar.gz && rm Trinity-v2.3.2.tar.gz
-WORKDIR /opt/trinityrnaseq-Trinity-v2.3.2/
-RUN make
-ENV PATH $PATH:/opt/trinityrnaseq-Trinity-v2.3.2/:/opt/trinityrnaseq-Trinity-v2.3.2/trinity-plugins/
-
-### install NextGenMap
-RUN git clone https://github.com/Cibiv/NextGenMap.git  /opt/NextGenMap/
-RUN mkdir /opt/NextGenMap/build
-WORKDIR /opt/NextGenMap/build
-RUN apt-get install --no-install-recommends  -qy cmake
-RUN cmake .. && make
-RUN make install prefix=/usr/local/bin
-ENV PATH /opt/NextGenMap/bin/ngm-0.5.3:$PATH
+RUN wget https://github.com/trinityrnaseq/trinityrnaseq/archive/Trinity-v2.4.0.tar.gz && \
+     tar zxf Trinity-v2.4.0.tar.gz && rm Trinity-v2.4.0.tar.gz &&\
+     cd /opt/trinityrnaseq-Trinity-v2.4.0/ && make
+ENV PATH $PATH:/opt/trinityrnaseq-Trinity-v2.4.0/:/opt/trinityrnaseq-Trinity-v2.4.0/trinity-plugins/
 
 
 ### install seqtk
-RUN git clone https://github.com/lh3/seqtk.git  /opt/seqtk/
 WORKDIR /opt/seqtk
-RUN make
+RUN git clone https://github.com/lh3/seqtk.git  /opt/seqtk/ && make
 ENV PATH /opt/seqtk:$PATH
 
 
 ### install cd-hit
 RUN git clone https://github.com/weizhongli/cdhit.git /opt/cdhit/
-WORKDIR /opt/cdhit/cd-hit-auxtools
-RUN make
+RUN cd /opt/cdhit/cd-hit-auxtools &&  make && \
+    cd /opt/cdhit &&  make  && make install
 ENV PATH /opt/cdhit/cd-hit-auxtools:$PATH
-WORKDIR /opt/cdhit
-RUN make
-RUN make install
-
 
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
 
-
 ### 
-RUN mkdir /data
 WORKDIR /data
