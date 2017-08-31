@@ -379,7 +379,7 @@ class RNA_species(object):
 
         (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
         self.add_time_statistic("Blast_fish", start = start)
-        self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
+        self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast_fish")))
 
     def get_read_sequences(self, Threads, Memory, meth="seqtk"):
         if self.PairedData:
