@@ -667,6 +667,10 @@ class RNA_species(object):
             # get sequence for filtered sequences in the trinityfasta
             self.FilteredTrinityFasta.complete_fasta(TrinityFasta)
 
+            # rename seq with species name
+            ## buil dic
+            new_name_dic = { n: self.Species+"_"+n for n in self.FilteredTrinityFasta.Names}
+            self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(new_name_dic)
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
 
