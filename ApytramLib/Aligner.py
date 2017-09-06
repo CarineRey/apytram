@@ -124,3 +124,31 @@ class Mafft(object):
             out = ""
 
         return (out, err)
+
+class CdHitEst(object):
+    """Define an object to launch CD-HIT"""
+    def __init__(self, InputFile, OutputFile, c=0.8, d=0):
+        self.logger = logging.getLogger('apytram.lib.Aligner.cd_hit_est')
+        self.InputFile = InputFile
+        self.c = c
+        self.OutputFile = OutputFile
+        self.d = 0
+
+    def run(self):
+        command = ["cd-hit-est",
+                   "-d", str(self.d),
+                   "-c", str(self.c),
+                   "-i", self.InputFile,
+                   "-o", self.OutputFile]
+        self.logger.debug(" ".join(command))
+        p = subprocess.Popen(command,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        (out, err) = p.communicate()
+        if err:
+            self.logger.error("Unexpected error when we launch cd-hit-est:\n")
+            self.logger.error(err)
+            self.logger.error(" ".join(command))
+            out = ""
+
+        return (out, err)
