@@ -851,7 +851,7 @@ for Query in QueriesList:
                     Species.Improvment = False
                     Species.CompletedIteration = False
 
-                if OldNumberReads !=0 and NbNewReads > 10000 and NbNewReads > 100 * OldNumberReads:
+                if OldNumberReads !=0 and NbNewReads > 20000 and NbNewReads > 5 * OldNumberReads:
                     logger.info("Number of reads has soared -> stop iteration")
                     Species.Improvment = False
                     Species.CompletedIteration = False
