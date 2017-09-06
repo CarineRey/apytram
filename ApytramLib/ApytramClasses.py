@@ -950,6 +950,166 @@ class Query(object):
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
+        # Simplify baitsequences
+        self.reduce_complexity_baitSequences()
+
+
+    def reduce_complexity_baitSequences(self):
+        from Bio import pairwise2
+        from Bio import SeqIO
+        from Bio.SubsMat import MatrixInfo as matlist
+
+        matrix = matlist.blosum62
+        gap_open = -10
+        gap_extend = -0.5
+
+        start = time.time()
+        Complex_BaitSequences = self.BaitSequences
+        Simplified_BaitSequences = "%s/BaitSequences.%d.s.fasta" %(self.TmpDirName, self.CumulIteration)
+        RepCluster_BaitSequences = "%s/BaitSequences.%d.s.fasta.rep" %(self.TmpDirName, self.CumulIteration)
+        Cluster_BaitSequences = "%s/BaitSequences.%d.s.fasta.rep.clstr" %(self.TmpDirName, self.CumulIteration)
+
+        # Run cd-hit-est to get cluster
+        CdHitEstProcess = Aligner.CdHitEst(Complex_BaitSequences,RepCluster_BaitSequences, c=0.85)
+        CdHitEstProcess.run()
+
+        self.logger.info("reduce_complexity_baitSequences --- %s seconds ---" %(time.time() - start))
+
+        # Read clustr
+
+        clstr_dic = ApytramNeeds.read_clstr(Cluster_BaitSequences)
+
+        # Read fasta
+        #fasta = ApytramNeeds.Fasta()
+        #fasta.read_fasta(FastaFilename = Complex_BaitSequences)
+        record_dict = SeqIO.to_dict(SeqIO.parse(Complex_BaitSequences, "fasta"))
+
+        seq_ok = []
+        for (cluster,seq_l) in clstr_dic.items():
+            rep_seq_name = ""
+            rep_seq = ""
+            # get rep:
+            for (seq, rep, rev) in seq_l:
+                if rep:
+                    rep_seq_name = seq
+                    rep_seq = str(record_dict[rep_seq_name].seq)
+                    break
+            for (seq_name, rep, rev) in seq_l:
+                if rep:
+                    seq_ok.append((rep_seq_name+"_rep", rep_seq))
+                else:
+                    # compare seq with rep_seq:
+                    seq = str(record_dict[seq_name].seq)
+                    starti = time.time()
+                    top_aln = pairwise2.align.globalds(rep_seq, seq, matrix, gap_open, gap_extend)[0]
+                    aln_rep, aln_seq, score, begin, end = top_aln
+                    print str(time.time() - starti)
+                    l_aln = len(aln_rep)
+                    s_aln = [0] * l_aln
+                    b = 0
+                    while aln_seq[b] == "-":
+                        b +=1
+                    e = l_aln -1
+                    while aln_seq[e] == "-":
+                        e -=1
+                    b_r = 0
+                    while aln_rep[b_r] == "-":
+                        b_r +=1
+                    e_r = l_aln -1
+                    while aln_rep[e_r] == "-":
+                        e_r -=1
+
+
+                    for i in range(b, e):
+                        if aln_seq[i] == "-":
+                            s_aln[i] = 5
+                        else:
+                            if aln_rep[i] != aln_seq[i]:
+                                s_aln[i] = 1
+                    # parse s_aln
+                    ## make region:
+                    lim_region = [0] + range(b_r, e_r+1, 25) + [e_r+1,l_aln]
+
+                    seq_keep = []
+                    i_x = 0
+                    j_x = 1
+                    seq_without_gap = []
+                    len_seq_without_gap = 0
+
+                    while j_x < len(lim_region):
+                        i=lim_region[i_x]
+                        j=lim_region[j_x]
+                        j_x+=1
+                        i_x+=1
+                        if sum(s_aln[i:j]) > 15:
+                            seq_to_add = aln_seq[i:j].replace("-","")
+                            seq_without_gap.append(seq_to_add)
+                            len_seq_without_gap += len(seq_to_add)
+                        else:
+                            if seq_without_gap:
+                                # check len sequence
+                                while len_seq_without_gap <= 100 and j_x < len(lim_region):
+                                    i=lim_region[i_x]
+                                    j=lim_region[j_x]
+                                    j_x+=1
+                                    i_x+=1
+                                    seq_to_add = aln_seq[i:j].replace("-","")
+                                    seq_without_gap.append(seq_to_add)
+                                    len_seq_without_gap += len(seq_to_add)
+                                if len(seq_without_gap) > 100:
+                                    seq_keep.append(seq_without_gap)
+                                    seq_without_gap = []
+                                    len_seq_without_gap = 0
+                                elif j_x == len(lim_region):
+                                    b_end = -5
+                                    seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
+                                    while len(seq_to_add) <=100 and abs(b_end) < len(lim_region):
+                                        b_end -=1
+                                        seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
+                                    seq_keep.append([seq_to_add])
+                                    seq_without_gap = []
+                                    len_seq_without_gap = 0
+                    if seq_without_gap:
+                        while len_seq_without_gap <= 100 and j_x < len(lim_region):
+                            i=lim_region[i_x]
+                            j=lim_region[j_x]
+                            j_x+=1
+                            i_x+=1
+                            seq_to_add = aln_seq[i:j].replace("-","")
+                            seq_without_gap.append(seq_to_add)
+                            len_seq_without_gap += len(seq_to_add)
+                        if len_seq_without_gap > 100:
+                            seq_keep.append(seq_without_gap)
+                            seq_without_gap = []
+                            len_seq_without_gap = 0
+                        elif j_x == len(lim_region):
+                            b_end = -5
+                            seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
+                            while len(seq_to_add) <=100 and abs(b_end) < len(lim_region):
+                                b_end -=1
+                                seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
+                            seq_keep.append([seq_to_add])
+                            seq_without_gap = []
+                            len_seq_without_gap = 0
+
+                    seq_name_i = 0
+                    for seq_i in seq_keep:
+                        seq_name_i +=1
+                        seq_ok.append((seq_name+"_"+str(seq_name_i), "".join(seq_i)))
+                        seq_keep = []
+
+        # Write new baitsequences file
+        if seq_ok:
+            string_seq_ok = []
+            for (n,s) in seq_ok:
+                string_seq_ok.append(">%s\n%s\n" %(n,s))
+            ApytramNeeds.write_in_file("".join(string_seq_ok), Simplified_BaitSequences)
+        print "Avant:" + str(ApytramNeeds.count_sequences (self.BaitSequences))
+        print "Avant:" + str(os.stat(self.BaitSequences).st_size)
+        print "Après:" + str(ApytramNeeds.count_sequences (Simplified_BaitSequences))
+        print "Après:" + str(os.stat(Simplified_BaitSequences).st_size)
+        self.BaitSequences = Simplified_BaitSequences
+
     def measure_final_coverage(self):
         if not self.Aligned:
             self.align_query()
