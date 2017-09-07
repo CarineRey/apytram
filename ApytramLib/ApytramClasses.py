@@ -955,14 +955,6 @@ class Query(object):
 
 
     def reduce_complexity_baitSequences(self):
-        from Bio import pairwise2
-        from Bio import SeqIO
-        from Bio.SubsMat import MatrixInfo as matlist
-
-        matrix = matlist.blosum62
-        gap_open = -10
-        gap_extend = -0.5
-
         start = time.time()
         Complex_BaitSequences = self.BaitSequences
         Simplified_BaitSequences = "%s/BaitSequences.%d.s.fasta" %(self.TmpDirName, self.CumulIteration)
@@ -976,13 +968,7 @@ class Query(object):
         self.logger.info("reduce_complexity_baitSequences --- %s seconds ---" %(time.time() - start))
 
         # Read clustr
-
         clstr_dic = ApytramNeeds.read_clstr(Cluster_BaitSequences)
-
-        # Read fasta
-        #fasta = ApytramNeeds.Fasta()
-        #fasta.read_fasta(FastaFilename = Complex_BaitSequences)
-        record_dict = SeqIO.to_dict(SeqIO.parse(Complex_BaitSequences, "fasta"))
 
         seq_ok = []
         for (cluster,seq_l) in clstr_dic.items():
@@ -992,18 +978,41 @@ class Query(object):
             for (seq, rep, rev) in seq_l:
                 if rep:
                     rep_seq_name = seq
-                    rep_seq = str(record_dict[rep_seq_name].seq)
+                    #rep_seq = str(record_dict[rep_seq_name].seq)
                     break
             for (seq_name, rep, rev) in seq_l:
                 if rep:
+                    file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
+                    ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
+                    SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                    (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
+                    f_rep = ApytramNeeds.Fasta()
+                    f_rep.read_fasta(String = f_rep_string)
+                    rep_seq = f_rep.get(rep_seq_name)
                     seq_ok.append((rep_seq_name+"_rep", rep_seq))
                 else:
                     # compare seq with rep_seq:
-                    seq = str(record_dict[seq_name].seq)
+
                     starti = time.time()
-                    top_aln = pairwise2.align.globalds(rep_seq, seq, matrix, gap_open, gap_extend)[0]
-                    aln_rep, aln_seq, score, begin, end = top_aln
-                    print str(time.time() - starti)
+
+                    # write name in a file
+                    file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
+                    file_with_seq_fasta = "%s/BaitSequences.%d.%s.tmp1.fasta" %(self.TmpDirName, self.CumulIteration, cluster)
+                    ApytramNeeds.write_in_file("%s\n%s" %(rep_seq_name, seq_name), file_with_seq_names)
+                    # get sequence with seqtk
+                    SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                    (out,err) = SeqtkProcess.launch_fasta_subseq(file_with_seq_names, file_with_seq_fasta)
+                    # align file
+                    MafftProcess = Aligner.Mafft(file_with_seq_fasta)
+                    MafftProcess.QuietOption = True
+                    MafftProcess.AutoOption = True
+                    (ali_string,err) = MafftProcess.get_output()
+                    # read alignment
+                    ali = ApytramNeeds.Fasta()
+                    ali.read_fasta(String = ali_string)
+                    aln_rep = ali.get(rep_seq_name)
+                    aln_seq = ali.get(seq_name)
+
                     l_aln = len(aln_rep)
                     s_aln = [0] * l_aln
                     b = 0
@@ -1019,84 +1028,71 @@ class Query(object):
                     while aln_rep[e_r] == "-":
                         e_r -=1
 
-
+                    # SCORING
                     for i in range(b, e):
+
                         if aln_seq[i] == "-":
                             s_aln[i] = 5
                         else:
                             if aln_rep[i] != aln_seq[i]:
                                 s_aln[i] = 1
-                    # parse s_aln
+                        #print aln_rep[i] + " " + aln_seq[i] + ":" + str(s_aln[i])
+                    # SCORE PARSING  and length measurement
                     ## make region:
                     lim_region = [0] + range(b_r, e_r+1, 25) + [e_r+1,l_aln]
+                    len_lim_region = len(lim_region)
+                    sp_l = [0] * len_lim_region
+                    len_seq_l = [0] * len_lim_region
 
-                    seq_keep = []
                     i_x = 0
-                    j_x = 1
-                    seq_without_gap = []
-                    len_seq_without_gap = 0
 
-                    while j_x < len(lim_region):
+                    while (i_x +1) < len_lim_region:
                         i=lim_region[i_x]
-                        j=lim_region[j_x]
-                        j_x+=1
+                        j=lim_region[i_x+1]
                         i_x+=1
-                        if sum(s_aln[i:j]) > 15:
-                            seq_to_add = aln_seq[i:j].replace("-","")
-                            seq_without_gap.append(seq_to_add)
-                            len_seq_without_gap += len(seq_to_add)
-                        else:
-                            if seq_without_gap:
-                                # check len sequence
-                                while len_seq_without_gap <= 100 and j_x < len(lim_region):
-                                    i=lim_region[i_x]
-                                    j=lim_region[j_x]
-                                    j_x+=1
-                                    i_x+=1
-                                    seq_to_add = aln_seq[i:j].replace("-","")
-                                    seq_without_gap.append(seq_to_add)
-                                    len_seq_without_gap += len(seq_to_add)
-                                if len(seq_without_gap) > 100:
-                                    seq_keep.append(seq_without_gap)
-                                    seq_without_gap = []
-                                    len_seq_without_gap = 0
-                                elif j_x == len(lim_region):
-                                    b_end = -5
-                                    seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
-                                    while len(seq_to_add) <=100 and abs(b_end) < len(lim_region):
-                                        b_end -=1
-                                        seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
-                                    seq_keep.append([seq_to_add])
-                                    seq_without_gap = []
-                                    len_seq_without_gap = 0
-                    if seq_without_gap:
-                        while len_seq_without_gap <= 100 and j_x < len(lim_region):
+                        len_seq_l[i_x] = len(aln_seq[i:j].replace("-",""))
+                        if sum(s_aln[i:j]) > 10:
+                            sp_l[i_x] = 1
+
+
+                    # extend region with score > 10
+                    e_sp_l = [0] * len_lim_region
+                    for i_x in range(len_lim_region):
+                        if sp_l[i_x]:
+                            len_seq_to_add = len_seq_l[i_x]
+                            e_sp_l[i_x] = 1
+                            j = 0
+                            while len_seq_to_add < 200 and j < (len_lim_region-1):
+                                j += 1
+                                if (i_x + j) in range(len_lim_region):
+                                    e_sp_l[(i_x + j)] = 1
+                                    len_seq_to_add += len_seq_l[i_x + j]
+                                if (i_x - j) in range(len_lim_region):
+                                    e_sp_l[(i_x - j)] = 1
+                                    len_seq_to_add += len_seq_l[i_x - j]
+
+                    # detect and write sub sequences
+
+                    seq_to_keep = []
+                    i_x = 0
+                    while i_x < len_lim_region:
+                        j_x = i_x
+                        if e_sp_l[i_x]:
+                            while e_sp_l[j_x] and j_x < (len_lim_region-1):
+                                j_x += 1
+                            # write sub sequence:
                             i=lim_region[i_x]
                             j=lim_region[j_x]
-                            j_x+=1
-                            i_x+=1
                             seq_to_add = aln_seq[i:j].replace("-","")
-                            seq_without_gap.append(seq_to_add)
-                            len_seq_without_gap += len(seq_to_add)
-                        if len_seq_without_gap > 100:
-                            seq_keep.append(seq_without_gap)
-                            seq_without_gap = []
-                            len_seq_without_gap = 0
-                        elif j_x == len(lim_region):
-                            b_end = -5
-                            seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
-                            while len(seq_to_add) <=100 and abs(b_end) < len(lim_region):
-                                b_end -=1
-                                seq_to_add = aln_seq[lim_region[b_end]:lim_region[-1]].replace("-","")
-                            seq_keep.append([seq_to_add])
-                            seq_without_gap = []
-                            len_seq_without_gap = 0
+                            seq_to_keep.append(seq_to_add)
+                        i_x = j_x
+                        i_x += 1
 
                     seq_name_i = 0
-                    for seq_i in seq_keep:
+                    for seq_i in seq_to_keep:
                         seq_name_i +=1
-                        seq_ok.append((seq_name+"_"+str(seq_name_i), "".join(seq_i)))
-                        seq_keep = []
+                        seq_ok.append((seq_name+"_"+str(seq_name_i), seq_i))
+                        seq_to_keep = []
 
         # Write new baitsequences file
         if seq_ok:
@@ -1109,6 +1105,8 @@ class Query(object):
         print "Après:" + str(ApytramNeeds.count_sequences (Simplified_BaitSequences))
         print "Après:" + str(os.stat(Simplified_BaitSequences).st_size)
         self.BaitSequences = Simplified_BaitSequences
+        print str(time.time() - start)
+        self.logger.debug("reduce complexity --- %s seconds ---" %(time.time() - start))
 
     def measure_final_coverage(self):
         if not self.Aligned:
