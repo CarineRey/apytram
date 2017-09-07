@@ -237,6 +237,15 @@ class Fasta(object):
         write_in_file(str(self), OutFastaFile)
 
 
+    def get(self, sequence_name):
+        i = 0
+        while i in range(len(self.Names)):
+            if self.Names[i] == sequence_name:
+                return self.Sequences[i].Sequence
+            i+=1
+        return ""
+
+
 def search(program):
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
