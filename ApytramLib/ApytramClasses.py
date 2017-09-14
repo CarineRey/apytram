@@ -965,148 +965,178 @@ class Query(object):
         CdHitEstProcess = Aligner.CdHitEst(Complex_BaitSequences,RepCluster_BaitSequences, c=0.85)
         CdHitEstProcess.run()
 
-        self.logger.info("reduce_complexity_baitSequences --- %s seconds ---" %(time.time() - start))
+        self.logger.info("reduce_complexity_baitSequences clustering --- %s seconds ---" %(time.time() - start))
 
         # Read clustr
         clstr_dic = ApytramNeeds.read_clstr(Cluster_BaitSequences)
 
         seq_ok = []
+        nb_subseq = 0
         for (cluster,seq_l) in clstr_dic.items():
             rep_seq_name = ""
             rep_seq = ""
-            # get rep:
-            for (seq, rep, rev) in seq_l:
-                if rep:
-                    rep_seq_name = seq
-                    #rep_seq = str(record_dict[rep_seq_name].seq)
-                    break
-            for (seq_name, rep, rev) in seq_l:
-                if rep:
-                    file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
-                    ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
-                    SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
-                    (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
-                    f_rep = ApytramNeeds.Fasta()
-                    f_rep.read_fasta(String = f_rep_string)
-                    rep_seq = f_rep.get(rep_seq_name)
-                    seq_ok.append((rep_seq_name+"_rep", rep_seq))
-                else:
-                    # compare seq with rep_seq:
+            if len(seq_l) == 1:
+                rep_seq_name = seq_l[0][0]
+                #Only 1 seq = rep
+                file_with_seq_names = "%s/BaitSequences.%d.%s.tmp" %(self.TmpDirName, self.CumulIteration, cluster)
+                ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
+                SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
+                f_rep = ApytramNeeds.Fasta()
+                f_rep.read_fasta(String = f_rep_string)
+                rep_seq = f_rep.get(rep_seq_name)
+                seq_ok.append((rep_seq_name+"_rep", rep_seq))
+            else:
+                #align all seqs
+                # write all seq names in a file
+                file_with_seq_names = "%s/BaitSequences.%d.%s.tmp" %(self.TmpDirName, self.CumulIteration, cluster)
+                file_with_seq_fasta = "%s/BaitSequences.%d.%s.tmp.fasta" %(self.TmpDirName, self.CumulIteration, cluster)
+                ApytramNeeds.write_in_file("\n".join([s for (s, _, _) in seq_l])+"\n", file_with_seq_names)
+                # get sequence with seqtk
+                SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                (out,err) = SeqtkProcess.launch_fasta_subseq(file_with_seq_names, file_with_seq_fasta)
+                # align file
+                MafftProcess = Aligner.Mafft(file_with_seq_fasta)
+                MafftProcess.QuietOption = True
+                MafftProcess.AutoOption = True
+                (ali_string,err) = MafftProcess.get_output()
+                # read alignment
+                ali = ApytramNeeds.Fasta()
+                ali.read_fasta(String = ali_string)
 
-                    starti = time.time()
+                # get rep:
+                for (seq, rep, rev) in seq_l:
+                    if rep:
+                        rep_seq_name = seq
+                        #rep_seq = str(record_dict[rep_seq_name].seq)
+                        break
+                starti = time.time()
+                for (seq_name, rep, rev) in seq_l:
+                    if rep:
+                        file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
+                        ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
+                        SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                        (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
+                        f_rep = ApytramNeeds.Fasta()
+                        f_rep.read_fasta(String = f_rep_string)
+                        rep_seq = f_rep.get(rep_seq_name)
+                        seq_ok.append((rep_seq_name+"_rep", rep_seq))
+                    else:
+                        # compare seq with rep_seq:
+                        aln_rep = ali.get(rep_seq_name)
+                        aln_seq = ali.get(seq_name)
 
-                    # write name in a file
-                    file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
-                    file_with_seq_fasta = "%s/BaitSequences.%d.%s.tmp1.fasta" %(self.TmpDirName, self.CumulIteration, cluster)
-                    ApytramNeeds.write_in_file("%s\n%s" %(rep_seq_name, seq_name), file_with_seq_names)
-                    # get sequence with seqtk
-                    SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
-                    (out,err) = SeqtkProcess.launch_fasta_subseq(file_with_seq_names, file_with_seq_fasta)
-                    # align file
-                    MafftProcess = Aligner.Mafft(file_with_seq_fasta)
-                    MafftProcess.QuietOption = True
-                    MafftProcess.AutoOption = True
-                    (ali_string,err) = MafftProcess.get_output()
-                    # read alignment
-                    ali = ApytramNeeds.Fasta()
-                    ali.read_fasta(String = ali_string)
-                    aln_rep = ali.get(rep_seq_name)
-                    aln_seq = ali.get(seq_name)
+                        l_aln = len(aln_rep)
+                        s_aln = [0] * l_aln
+                        b = 0
+                        while aln_seq[b] == "-":
+                            b +=1
+                        e = l_aln -1
+                        while aln_seq[e] == "-":
+                            e -=1
+                        b_r = 0
+                        while aln_rep[b_r] == "-":
+                            b_r +=1
+                        e_r = l_aln -1
+                        while aln_rep[e_r] == "-":
+                            e_r -=1
 
-                    l_aln = len(aln_rep)
-                    s_aln = [0] * l_aln
-                    b = 0
-                    while aln_seq[b] == "-":
-                        b +=1
-                    e = l_aln -1
-                    while aln_seq[e] == "-":
-                        e -=1
-                    b_r = 0
-                    while aln_rep[b_r] == "-":
-                        b_r +=1
-                    e_r = l_aln -1
-                    while aln_rep[e_r] == "-":
-                        e_r -=1
+                        # SCORING
+                        for i in range(b, e):
 
-                    # SCORING
-                    for i in range(b, e):
+                            if aln_seq[i] == "-":
+                                s_aln[i] = 5
+                            else:
+                                if aln_rep[i] != aln_seq[i]:
+                                    s_aln[i] = 2
+                            #print aln_rep[i] + " " + aln_seq[i] + ":" + str(s_aln[i])
+                        # SCORE PARSING  and length measurement
+                        ## make region:
+                        lim_region = [0] + range(b_r, e_r+1, 25) + [e_r+1,l_aln]
+                        len_lim_region = len(lim_region)
+                        sp_l = [0] * len_lim_region
+                        len_seq_l = [0] * len_lim_region
 
-                        if aln_seq[i] == "-":
-                            s_aln[i] = 5
-                        else:
-                            if aln_rep[i] != aln_seq[i]:
-                                s_aln[i] = 1
-                        #print aln_rep[i] + " " + aln_seq[i] + ":" + str(s_aln[i])
-                    # SCORE PARSING  and length measurement
-                    ## make region:
-                    lim_region = [0] + range(b_r, e_r+1, 25) + [e_r+1,l_aln]
-                    len_lim_region = len(lim_region)
-                    sp_l = [0] * len_lim_region
-                    len_seq_l = [0] * len_lim_region
+                        i_x = 0
 
-                    i_x = 0
-
-                    while (i_x +1) < len_lim_region:
-                        i=lim_region[i_x]
-                        j=lim_region[i_x+1]
-                        i_x+=1
-                        len_seq_l[i_x] = len(aln_seq[i:j].replace("-",""))
-                        if sum(s_aln[i:j]) > 10:
-                            sp_l[i_x] = 1
-
-
-                    # extend region with score > 10
-                    e_sp_l = [0] * len_lim_region
-                    for i_x in range(len_lim_region):
-                        if sp_l[i_x]:
-                            len_seq_to_add = len_seq_l[i_x]
-                            e_sp_l[i_x] = 1
-                            j = 0
-                            while len_seq_to_add < 200 and j < (len_lim_region-1):
-                                j += 1
-                                if (i_x + j) in range(len_lim_region):
-                                    e_sp_l[(i_x + j)] = 1
-                                    len_seq_to_add += len_seq_l[i_x + j]
-                                if (i_x - j) in range(len_lim_region):
-                                    e_sp_l[(i_x - j)] = 1
-                                    len_seq_to_add += len_seq_l[i_x - j]
-
-                    # detect and write sub sequences
-
-                    seq_to_keep = []
-                    i_x = 0
-                    while i_x < len_lim_region:
-                        j_x = i_x
-                        if e_sp_l[i_x]:
-                            while e_sp_l[j_x] and j_x < (len_lim_region-1):
-                                j_x += 1
-                            # write sub sequence:
+                        while (i_x +1) < len_lim_region:
                             i=lim_region[i_x]
-                            j=lim_region[j_x]
-                            seq_to_add = aln_seq[i:j].replace("-","")
-                            seq_to_keep.append(seq_to_add)
-                        i_x = j_x
-                        i_x += 1
+                            j=lim_region[i_x+1]
+                            i_x+=1
+                            len_seq_l[i_x] = len(aln_seq[i:j].replace("-",""))
+                            if sum(s_aln[i:j]) > 10:
+                                sp_l[i_x] = 1
 
-                    seq_name_i = 0
-                    for seq_i in seq_to_keep:
-                        seq_name_i +=1
-                        seq_ok.append((seq_name+"_"+str(seq_name_i), seq_i))
-                        seq_to_keep = []
 
+                        # extend region with score > 10
+                        e_sp_l = [0] * len_lim_region
+                        for i_x in range(len_lim_region):
+                            if sp_l[i_x]:
+                                len_seq_to_add = len_seq_l[i_x]
+                                e_sp_l[i_x] = 1
+                                j = 0
+                                while len_seq_to_add < 200 and j < (len_lim_region-1):
+                                    j += 1
+                                    if (i_x + j) in range(len_lim_region):
+                                        e_sp_l[(i_x + j)] = 1
+                                        len_seq_to_add += len_seq_l[i_x + j]
+                                    if (i_x - j) in range(len_lim_region):
+                                        e_sp_l[(i_x - j)] = 1
+                                        len_seq_to_add += len_seq_l[i_x - j]
+
+                        # detect and write sub sequences
+
+                        subseq_to_keep = []
+                        i_x = 0
+                        while i_x < len_lim_region:
+                            j_x = i_x
+                            if e_sp_l[i_x]:
+                                while e_sp_l[j_x] and j_x < (len_lim_region-1):
+                                    j_x += 1
+                                # write sub sequence:
+                                i=lim_region[i_x]
+                                j=lim_region[j_x]
+                                seq_to_add = aln_seq[i:j].replace("-","")
+                                subseq_to_keep.append(seq_to_add)
+                            i_x = j_x
+                            i_x += 1
+
+                        seq_name_i = 0
+                        for seq_i in subseq_to_keep:
+                            seq_name_i +=1
+                            nb_subseq +=1
+                            seq_ok.append((seq_name+"_"+str(seq_name_i), seq_i))
+                            seq_to_keep = []
         # Write new baitsequences file
         if seq_ok:
             string_seq_ok = []
             for (n,s) in seq_ok:
                 string_seq_ok.append(">%s\n%s\n" %(n,s))
             ApytramNeeds.write_in_file("".join(string_seq_ok), Simplified_BaitSequences)
+
+        print "#####"
         print "Avant:" + str(ApytramNeeds.count_sequences (self.BaitSequences))
         print "Avant:" + str(os.stat(self.BaitSequences).st_size)
         print "Après:" + str(ApytramNeeds.count_sequences (Simplified_BaitSequences))
         print "Après:" + str(os.stat(Simplified_BaitSequences).st_size)
-        self.BaitSequences = Simplified_BaitSequences
-        print str(time.time() - start)
-        self.logger.debug("reduce complexity --- %s seconds ---" %(time.time() - start))
+
+        if nb_subseq > 0:
+            Rep2Cluster_BaitSequences = "%s/BaitSequences.%d.s2.fasta.rep" %(self.TmpDirName, self.CumulIteration)
+            # Run cd-hit-est to remove redundancy
+            start_fc = time.time()
+            CdHitEstProcess = Aligner.CdHitEst(Simplified_BaitSequences,Rep2Cluster_BaitSequences, c=1)
+            CdHitEstProcess.run()
+            print((time.time() - start_fc))
+            self.logger.info("reduce_final_redundancy_baitSequences clustering --- %s seconds ---" %(time.time() - start_fc))
+            print "Après cdhit:" + str(ApytramNeeds.count_sequences (Rep2Cluster_BaitSequences))
+            print "Après cdhit:" + str(os.stat(Rep2Cluster_BaitSequences).st_size)
+            self.BaitSequences = Rep2Cluster_BaitSequences
+        else:
+            self.BaitSequences = Simplified_BaitSequences
+        print self.BaitSequences
+        print "#####"
+        print "Reduce complexity:" + str(time.time() - start)
+        self.logger.info("reduce complexity all--- %s seconds ---" %(time.time() - start))
 
     def measure_final_coverage(self):
         if not self.Aligned:
