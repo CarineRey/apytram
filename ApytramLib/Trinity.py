@@ -51,7 +51,7 @@ def get_version():
 
 class Trinity(object):
     """Define an object to launch Trinity"""
-    def __init__(self, OutputFile, single="", left="", right=""):
+    def __init__(self, OutputFile, single="", left="", right="", longreads=""):
         self.logger = logging.getLogger('apytram.lib.Trinity')
         self.seqType = "fa"
         self.max_memory = 1
@@ -60,6 +60,7 @@ class Trinity(object):
         self.OutputFile = OutputFile
         self.RightInputFile = right
         self.LeftInputFile = left
+        self.LongReads = longreads
         self.MinLength = 200
         self.RunAsPaired = False
         self.FullCleanup = False
@@ -89,6 +90,9 @@ class Trinity(object):
         if self.LeftInputFile:
             command.extend(["--left", self.LeftInputFile])
 
+        if self.LongReads:
+            command.extend(["--long_reads", self.LongReads])
+
         if self.RunAsPaired:
             command.append("--run_as_paired")
 
@@ -116,6 +120,8 @@ class Trinity(object):
         if err:
             self.logger.error(
                  "Unexpected error when we launch Trinity:\n")
+            self.logger.error(
+                 " ".join(command))
             self.logger.debug(
                  "[...]\n"+"\n".join(out.strip().split("\n")[-20:]))
             self.logger.error(err)

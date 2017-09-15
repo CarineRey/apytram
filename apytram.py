@@ -870,7 +870,7 @@ for Query in QueriesList:
                     Species.get_read_sequences(Threads, Memory, meth="blastdbcmd")
 
                 ### Launch Trinity
-                Species.launch_Trinity(Threads, Memory)
+                Species.launch_Trinity(Threads, Memory, long_read=True)
 
                 if not os.path.isfile(Species.TrinityFastaFilename): # Trinity found nothing
                     Species.Improvment = False

@@ -474,7 +474,7 @@ class RNA_species(object):
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
-    def launch_Trinity(self, Threads, Memory):
+    def launch_Trinity(self, Threads, Memory, long_read=False):
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
@@ -489,6 +489,8 @@ class RNA_species(object):
         # If there is a huge number of reads, remove duplicated reads
         if self.ReadsNumber < 500:
             TrinityProcess.NoNormalizeReads = True
+        if long_read and os.path.isfile(self.PreviousFilteredTrinityFastaFilename):
+            TrinityProcess.LongReads = self.PreviousFilteredTrinityFastaFilename
 
         TrinityProcess.CPU = Threads
         TrinityProcess.max_memory = Memory
