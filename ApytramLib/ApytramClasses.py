@@ -955,7 +955,8 @@ class Query(object):
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
         # Simplify baitsequences
-        self.reduce_complexity_baitSequences()
+        if ApytramNeeds.count_sequences(self.BaitSequences) > 300:
+            self.reduce_complexity_baitSequences()
 
 
     def reduce_complexity_baitSequences(self):
@@ -966,7 +967,7 @@ class Query(object):
         Cluster_BaitSequences = "%s/BaitSequences.%d.s.fasta.rep.clstr" %(self.TmpDirName, self.CumulIteration)
 
         # Run cd-hit-est to get cluster
-        CdHitEstProcess = Aligner.CdHitEst(Complex_BaitSequences,RepCluster_BaitSequences, c=0.85)
+        CdHitEstProcess = Aligner.CdHitEst(Complex_BaitSequences,RepCluster_BaitSequences, c=0.80)
         CdHitEstProcess.run()
 
         self.logger.info("reduce_complexity_baitSequences clustering --- %s seconds ---" %(time.time() - start))
@@ -1017,13 +1018,7 @@ class Query(object):
                 starti = time.time()
                 for (seq_name, rep, rev) in seq_l:
                     if rep:
-                        file_with_seq_names = "%s/BaitSequences.%d.%s.tmp1" %(self.TmpDirName, self.CumulIteration, cluster)
-                        ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
-                        SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
-                        (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
-                        f_rep = ApytramNeeds.Fasta()
-                        f_rep.read_fasta(String = f_rep_string)
-                        rep_seq = f_rep.get(rep_seq_name)
+                        rep_seq = ali.get(rep_seq_name).replace("-","")
                         seq_ok.append((rep_seq_name+"_rep", rep_seq))
                     else:
                         # compare seq with rep_seq:
