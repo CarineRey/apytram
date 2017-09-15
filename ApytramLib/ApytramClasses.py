@@ -362,9 +362,11 @@ class RNA_species(object):
         self.HomologyBetweenIterFilename = "%s/iter_%d_%d" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
     def fish_reads(self, BaitSequencesFilename,Threads):
+
+        self.launch_Blastn(BaitSequencesFilename.replace(".s2","").replace(".s",""),Threads, ext="test_without_reduce")
         self.launch_Blastn(BaitSequencesFilename,Threads)
 
-    def launch_Blastn(self,BaitSequencesFilename,Threads):
+    def launch_Blastn(self,BaitSequencesFilename,Threads,ext=""):
         start = time.time()
         self.logger.info("Blast bait sequences on reads database")
         BlastnProcess = BlastPlus.Blast("blastn", self.DatabaseName, BaitSequencesFilename)
@@ -377,9 +379,9 @@ class RNA_species(object):
         else:
             BlastnProcess.perc_identity = 97 # other iteration -> less authorized divergente because same species
 
-        (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
+        (out,err) = BlastnProcess.launch(self.ReadNamesFilename+ext)
         self.add_time_statistic("Blast_fish", start = start)
-        self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast_fish")))
+        self.logger.info("End Blast (%s seconds) %s",self.get_time_statistic("Blast_fish"),ext)
 
     def get_read_sequences(self, Threads, Memory, meth="seqtk"):
         if self.PairedData:
@@ -1045,7 +1047,7 @@ class Query(object):
                         for i in range(b, e):
 
                             if aln_seq[i] == "-":
-                                s_aln[i] = 5
+                                s_aln[i] = 2
                             else:
                                 if aln_rep[i] != aln_seq[i]:
                                     s_aln[i] = 2
@@ -1064,7 +1066,7 @@ class Query(object):
                             j=lim_region[i_x+1]
                             i_x+=1
                             len_seq_l[i_x] = len(aln_seq[i:j].replace("-",""))
-                            if sum(s_aln[i:j]) > 10:
+                            if sum(s_aln[i:j]) > 2:
                                 sp_l[i_x] = 1
 
 
@@ -1075,7 +1077,7 @@ class Query(object):
                                 len_seq_to_add = len_seq_l[i_x]
                                 e_sp_l[i_x] = 1
                                 j = 0
-                                while len_seq_to_add < 200 and j < (len_lim_region-1):
+                                while len_seq_to_add < 250 and j < (len_lim_region-1):
                                     j += 1
                                     if (i_x + j) in range(len_lim_region):
                                         e_sp_l[(i_x + j)] = 1
@@ -1121,7 +1123,7 @@ class Query(object):
         print "Après:" + str(os.stat(Simplified_BaitSequences).st_size)
 
         if nb_subseq > 0:
-            Rep2Cluster_BaitSequences = "%s/BaitSequences.%d.s2.fasta.rep" %(self.TmpDirName, self.CumulIteration)
+            Rep2Cluster_BaitSequences = "%s/BaitSequences.%d.s2.fasta" %(self.TmpDirName, self.CumulIteration)
             # Run cd-hit-est to remove redundancy
             start_fc = time.time()
             CdHitEstProcess = Aligner.CdHitEst(Simplified_BaitSequences,Rep2Cluster_BaitSequences, c=1)
