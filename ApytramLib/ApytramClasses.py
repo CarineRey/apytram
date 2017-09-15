@@ -363,7 +363,7 @@ class RNA_species(object):
 
     def fish_reads(self, BaitSequencesFilename,Threads):
 
-        self.launch_Blastn(BaitSequencesFilename.replace(".s2","").replace(".s",""),Threads, ext="test_without_reduce")
+        #self.launch_Blastn(BaitSequencesFilename.replace(".s2","").replace(".s",""),Threads, ext="test_without_reduce")
         self.launch_Blastn(BaitSequencesFilename,Threads)
 
     def launch_Blastn(self,BaitSequencesFilename,Threads,ext=""):
