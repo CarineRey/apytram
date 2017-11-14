@@ -107,10 +107,10 @@ class Trinity(object):
             Trinity_version = get_version()
             if Trinity_version[0] > 2 :
                 command.append("--no_normalize_reads")
-            elif Trinity_version[0] == 2 & Trinity_version[1] >= 3:
+            elif Trinity_version[0] == 2 and Trinity_version[1] >= 3:
                 command.append("--no_normalize_reads")
             else:
-                self.logger.warning("This version of Trinity has not the otption --no_normalize_reads")
+                self.logger.warning("This version of Trinity has not the option --no_normalize_reads")
 
         if self.SS_lib_type in ["FR", "RF", "F", "R"]:
             command.extend(["--SS_lib_type", self.SS_lib_type])

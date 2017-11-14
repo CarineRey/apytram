@@ -112,7 +112,7 @@ class TestConfigApytram(unittest.TestCase):
                 Trinity_version = ApytramLib.Trinity.get_version()
                 if Trinity_version[0] >= 2:
                     v = True
-                    if not (Trinity_version[0] == 2 & Trinity_version[1] >= 3):
+                    if not (Trinity_version[0] == 2 and Trinity_version[1] >= 3):
                         print "\tTrinity version must be >= v2.3 (current v%s)" %(".".join(map(str,Trinity_version)))
                 else:
                     v = False
