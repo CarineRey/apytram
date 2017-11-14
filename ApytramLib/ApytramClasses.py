@@ -362,9 +362,11 @@ class RNA_species(object):
         self.HomologyBetweenIterFilename = "%s/iter_%d_%d" %(self.TmpDirName,self.CurrentIteration -1, self.CurrentIteration)
 
     def fish_reads(self, BaitSequencesFilename,Threads):
+
+        #self.launch_Blastn(BaitSequencesFilename.replace(".s2","").replace(".s",""),Threads, ext="test_without_reduce")
         self.launch_Blastn(BaitSequencesFilename,Threads)
 
-    def launch_Blastn(self,BaitSequencesFilename,Threads):
+    def launch_Blastn(self,BaitSequencesFilename,Threads,ext=""):
         start = time.time()
         self.logger.info("Blast bait sequences on reads database")
         BlastnProcess = BlastPlus.Blast("blastn", self.DatabaseName, BaitSequencesFilename)
@@ -377,9 +379,9 @@ class RNA_species(object):
         else:
             BlastnProcess.perc_identity = 97 # other iteration -> less authorized divergente because same species
 
-        (out,err) = BlastnProcess.launch(self.ReadNamesFilename)
+        (out,err) = BlastnProcess.launch(self.ReadNamesFilename+ext)
         self.add_time_statistic("Blast_fish", start = start)
-        self.logger.info("End Blast (%s seconds)" %(self.get_time_statistic("Blast")))
+        self.logger.info("End Blast (%s seconds) %s",self.get_time_statistic("Blast_fish"),ext)
 
     def get_read_sequences(self, Threads, Memory, meth="seqtk"):
         if self.PairedData:
@@ -472,7 +474,7 @@ class RNA_species(object):
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
-    def launch_Trinity(self, Threads, Memory):
+    def launch_Trinity(self, Threads, Memory, long_read=False):
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
@@ -487,6 +489,8 @@ class RNA_species(object):
         # If there is a huge number of reads, remove duplicated reads
         if self.ReadsNumber < 500:
             TrinityProcess.NoNormalizeReads = True
+        if long_read and os.path.isfile(self.PreviousFilteredTrinityFastaFilename):
+            TrinityProcess.LongReads = self.PreviousFilteredTrinityFastaFilename
 
         TrinityProcess.CPU = Threads
         TrinityProcess.max_memory = Memory
@@ -667,6 +671,10 @@ class RNA_species(object):
             # get sequence for filtered sequences in the trinityfasta
             self.FilteredTrinityFasta.complete_fasta(TrinityFasta)
 
+            # rename seq with species name
+            ## buil dic
+            new_name_dic = { n: self.Species+"_"+n for n in self.FilteredTrinityFasta.Names}
+            self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(new_name_dic)
             # Write fasta
             self.FilteredTrinityFasta.write_fasta(self.FilteredTrinityFastaFilename)
 
@@ -945,6 +953,189 @@ class Query(object):
 
         if SpeciesCurrentReconstructedSequencesFileList:
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
+
+        # Simplify baitsequences
+        if ApytramNeeds.count_sequences(self.BaitSequences) > 300:
+            self.reduce_complexity_baitSequences()
+
+
+    def reduce_complexity_baitSequences(self):
+        start = time.time()
+        Complex_BaitSequences = self.BaitSequences
+        Simplified_BaitSequences = "%s/BaitSequences.%d.s.fasta" %(self.TmpDirName, self.CumulIteration)
+        RepCluster_BaitSequences = "%s/BaitSequences.%d.s.fasta.rep" %(self.TmpDirName, self.CumulIteration)
+        Cluster_BaitSequences = "%s/BaitSequences.%d.s.fasta.rep.clstr" %(self.TmpDirName, self.CumulIteration)
+
+        # Run cd-hit-est to get cluster
+        CdHitEstProcess = Aligner.CdHitEst(Complex_BaitSequences,RepCluster_BaitSequences, c=0.80)
+        CdHitEstProcess.run()
+
+        self.logger.info("reduce_complexity_baitSequences clustering --- %s seconds ---" %(time.time() - start))
+
+        # Read clustr
+        clstr_dic = ApytramNeeds.read_clstr(Cluster_BaitSequences)
+
+        seq_ok = []
+        nb_subseq = 0
+        for (cluster,seq_l) in clstr_dic.items():
+            rep_seq_name = ""
+            rep_seq = ""
+            if len(seq_l) == 1:
+                rep_seq_name = seq_l[0][0]
+                #Only 1 seq = rep
+                file_with_seq_names = "%s/BaitSequences.%d.%s.tmp" %(self.TmpDirName, self.CumulIteration, cluster)
+                ApytramNeeds.write_in_file("%s" %(rep_seq_name), file_with_seq_names)
+                SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                (f_rep_string,err) = SeqtkProcess.launch_fasta_subseq_stdout(file_with_seq_names)
+                f_rep = ApytramNeeds.Fasta()
+                f_rep.read_fasta(String = f_rep_string)
+                rep_seq = f_rep.get(rep_seq_name)
+                seq_ok.append((rep_seq_name+"_rep", rep_seq))
+            else:
+                #align all seqs
+                # write all seq names in a file
+                file_with_seq_names = "%s/BaitSequences.%d.%s.tmp" %(self.TmpDirName, self.CumulIteration, cluster)
+                file_with_seq_fasta = "%s/BaitSequences.%d.%s.tmp.fasta" %(self.TmpDirName, self.CumulIteration, cluster)
+                ApytramNeeds.write_in_file("\n".join([s for (s, _, _) in seq_l])+"\n", file_with_seq_names)
+                # get sequence with seqtk
+                SeqtkProcess = Seqtk.Seqtk(fasta=self.BaitSequences)
+                (out,err) = SeqtkProcess.launch_fasta_subseq(file_with_seq_names, file_with_seq_fasta)
+                # align file
+                MafftProcess = Aligner.Mafft(file_with_seq_fasta)
+                MafftProcess.QuietOption = True
+                MafftProcess.AutoOption = True
+                (ali_string,err) = MafftProcess.get_output()
+                # read alignment
+                ali = ApytramNeeds.Fasta()
+                ali.read_fasta(String = ali_string)
+
+                # get rep:
+                for (seq, rep, rev) in seq_l:
+                    if rep:
+                        rep_seq_name = seq
+                        #rep_seq = str(record_dict[rep_seq_name].seq)
+                        break
+                starti = time.time()
+                for (seq_name, rep, rev) in seq_l:
+                    if rep:
+                        rep_seq = ali.get(rep_seq_name).replace("-","")
+                        seq_ok.append((rep_seq_name+"_rep", rep_seq))
+                    else:
+                        # compare seq with rep_seq:
+                        aln_rep = ali.get(rep_seq_name)
+                        aln_seq = ali.get(seq_name)
+
+                        l_aln = len(aln_rep)
+                        s_aln = [0] * l_aln
+                        b = 0
+                        while aln_seq[b] == "-":
+                            b +=1
+                        e = l_aln -1
+                        while aln_seq[e] == "-":
+                            e -=1
+                        b_r = 0
+                        while aln_rep[b_r] == "-":
+                            b_r +=1
+                        e_r = l_aln -1
+                        while aln_rep[e_r] == "-":
+                            e_r -=1
+
+                        # SCORING
+                        for i in range(b, e):
+
+                            if aln_seq[i] == "-":
+                                s_aln[i] = 2
+                            else:
+                                if aln_rep[i] != aln_seq[i]:
+                                    s_aln[i] = 2
+                            #print aln_rep[i] + " " + aln_seq[i] + ":" + str(s_aln[i])
+                        # SCORE PARSING  and length measurement
+                        ## make region:
+                        lim_region = [0] + range(b_r, e_r+1, 25) + [e_r+1,l_aln]
+                        len_lim_region = len(lim_region)
+                        sp_l = [0] * len_lim_region
+                        len_seq_l = [0] * len_lim_region
+
+                        i_x = 0
+
+                        while (i_x +1) < len_lim_region:
+                            i=lim_region[i_x]
+                            j=lim_region[i_x+1]
+                            i_x+=1
+                            len_seq_l[i_x] = len(aln_seq[i:j].replace("-",""))
+                            if sum(s_aln[i:j]) > 2:
+                                sp_l[i_x] = 1
+
+
+                        # extend region with score > 10
+                        e_sp_l = [0] * len_lim_region
+                        for i_x in range(len_lim_region):
+                            if sp_l[i_x]:
+                                len_seq_to_add = len_seq_l[i_x]
+                                e_sp_l[i_x] = 1
+                                j = 0
+                                while len_seq_to_add < 250 and j < (len_lim_region-1):
+                                    j += 1
+                                    if (i_x + j) in range(len_lim_region):
+                                        e_sp_l[(i_x + j)] = 1
+                                        len_seq_to_add += len_seq_l[i_x + j]
+                                    if (i_x - j) in range(len_lim_region):
+                                        e_sp_l[(i_x - j)] = 1
+                                        len_seq_to_add += len_seq_l[i_x - j]
+
+                        # detect and write sub sequences
+
+                        subseq_to_keep = []
+                        i_x = 0
+                        while i_x < len_lim_region:
+                            j_x = i_x
+                            if e_sp_l[i_x]:
+                                while e_sp_l[j_x] and j_x < (len_lim_region-1):
+                                    j_x += 1
+                                # write sub sequence:
+                                i=lim_region[i_x]
+                                j=lim_region[j_x]
+                                seq_to_add = aln_seq[i:j].replace("-","")
+                                subseq_to_keep.append(seq_to_add)
+                            i_x = j_x
+                            i_x += 1
+
+                        seq_name_i = 0
+                        for seq_i in subseq_to_keep:
+                            seq_name_i +=1
+                            nb_subseq +=1
+                            seq_ok.append((seq_name+"_"+str(seq_name_i), seq_i))
+                            seq_to_keep = []
+        # Write new baitsequences file
+        if seq_ok:
+            string_seq_ok = []
+            for (n,s) in seq_ok:
+                string_seq_ok.append(">%s\n%s\n" %(n,s))
+            ApytramNeeds.write_in_file("".join(string_seq_ok), Simplified_BaitSequences)
+
+        print "#####"
+        print "Avant:" + str(ApytramNeeds.count_sequences (self.BaitSequences))
+        print "Avant:" + str(os.stat(self.BaitSequences).st_size)
+        print "Après:" + str(ApytramNeeds.count_sequences (Simplified_BaitSequences))
+        print "Après:" + str(os.stat(Simplified_BaitSequences).st_size)
+
+        if nb_subseq > 0:
+            Rep2Cluster_BaitSequences = "%s/BaitSequences.%d.s2.fasta" %(self.TmpDirName, self.CumulIteration)
+            # Run cd-hit-est to remove redundancy
+            start_fc = time.time()
+            CdHitEstProcess = Aligner.CdHitEst(Simplified_BaitSequences,Rep2Cluster_BaitSequences, c=1)
+            CdHitEstProcess.run()
+            print((time.time() - start_fc))
+            self.logger.info("reduce_final_redundancy_baitSequences clustering --- %s seconds ---" %(time.time() - start_fc))
+            print "Après cdhit:" + str(ApytramNeeds.count_sequences (Rep2Cluster_BaitSequences))
+            print "Après cdhit:" + str(os.stat(Rep2Cluster_BaitSequences).st_size)
+            self.BaitSequences = Rep2Cluster_BaitSequences
+        else:
+            self.BaitSequences = Simplified_BaitSequences
+        print self.BaitSequences
+        print "#####"
+        print "Reduce complexity:" + str(time.time() - start)
+        self.logger.info("reduce complexity all--- %s seconds ---" %(time.time() - start))
 
     def measure_final_coverage(self):
         if not self.Aligned:

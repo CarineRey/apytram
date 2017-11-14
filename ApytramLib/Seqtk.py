@@ -61,3 +61,10 @@ class Seqtk(object):
             (out, err) = p.communicate()
         return (out, err)
 
+    def launch_fasta_subseq_stdout(self, list_seqs):
+        command = ["seqtk", "subseq",  self.fasta, list_seqs]
+        self.logger.debug(" ".join(command))
+        p = subprocess.Popen(command,stdout=subprocess.PIPE)
+        (out, err) = p.communicate()
+        return (out, err)
+
