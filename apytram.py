@@ -80,7 +80,7 @@ parser = argparse.ArgumentParser(prog="apytram.py",
                                  description='''
     Run apytram.py on a fastq file to retrieve
     homologous sequences of bait sequences.''')
-parser.add_argument('--version', action='version', version='%(prog)s 1.1')
+parser.add_argument('--version', action='version', version='%(prog)s 1.2')
 
 ##############
 requiredOptions = parser.add_argument_group('Required arguments')

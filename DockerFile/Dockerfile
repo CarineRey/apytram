@@ -94,10 +94,6 @@ ENV PATH /opt/TransDecoder-"$transdecoder_version"/:$PATH
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
 
-# DEV apytram
-WORKDIR /opt/apytram
-RUN git fetch origin && git checkout dev
-
 ##### install entrypoint
 ADD entrypoint.sh /usr/local/bin/entrypoint.sh
 
