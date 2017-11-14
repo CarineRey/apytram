@@ -48,6 +48,7 @@ import Aligner
 import BlastPlus
 import Trinity
 import Seqtk
+import Transdecoder
 
 import pandas
 import matplotlib
@@ -66,6 +67,7 @@ class Exec_stats(object):
                              "Seqtk": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
+                             "Transdecoder": 0,
                              "Exonerate_on_ref":0,
                              "Exonerate_between_iter":0,
                              "Blast_on_ref":0,
@@ -474,7 +476,7 @@ class RNA_species(object):
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
-    def launch_Trinity(self, Threads, Memory, long_read=False):
+    def launch_Trinity(self, Threads, Memory, long_read=False, cds=False):
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
@@ -509,17 +511,33 @@ class RNA_species(object):
         if not os.path.isfile(self.TrinityFastaFilename):
             if ExitCode == 2 or ExitCode == 0 : # Trinity exit 0 if "No butterfly assemblies to report"
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-               self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)" %(self.CurrentIteration,ExitCode) )
+               self.logger.warning("Trinity has assembled no contigs at the end of the iteration %s (ExitCode: %d)", self.CurrentIteration,ExitCode)
             elif ExitCode == 255:
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-               self.logger.error("Trinity has crashed (ExitCode: %d). Do you use the last version of Trinity (>= 2.3)?" %(ExitCode))
+               self.logger.error("Trinity has crashed (ExitCode: %d). Do you use the last version of Trinity (>= 2.3)?", (ExitCode))
             elif ExitCode != 0:
                self.logger.debug("Trinity found nothing...\n[...]\n"+"\n".join(out.strip().split("\n")[-15:]))
-               self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?" %(ExitCode))
+               self.logger.error("Trinity has crashed (ExitCode: %d). Are all dependencies satisfied?", ExitCode)
 
 
         self.add_time_statistic("Trinity", start = start)
         self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))
+
+        if cds:
+            self.keep_only_cds()
+
+    def keep_only_cds(self):
+        start = time.time()
+        ##
+        TransdecoderProcess = Transdecoder.TransDecoder(self.TrinityFastaFilename,
+                                             min_prot_length=150, TmpDir=self.TmpDirName)
+        returncode = TransdecoderProcess.launch()
+        if not returncode:
+            self.TrinityFastaFilename = self.TrinityFastaFilename + ".transdecoder.cds"
+        else:
+            self.logger.info("Transdecoder ended with an error (%d)", returncode)
+        self.add_time_statistic("Transdecoder", start = start)
+        self.logger.info("End Transdecoder (%s seconds)", self.get_time_statistic("Transdecoder"))
 
     def get_homology_between_trinity_results_and_references(self,Query, method="blastn"):
         if method == "exonerate":
