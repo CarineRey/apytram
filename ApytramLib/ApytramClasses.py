@@ -66,6 +66,7 @@ class Exec_stats(object):
                              "Seqtk": 0,
                              "Blastdbcmd": 0,
                              "Trinity": 0,
+                             "Transdecoder": 0,
                              "Exonerate_on_ref":0,
                              "Exonerate_between_iter":0,
                              "Blast_on_ref":0,
@@ -474,7 +475,7 @@ class RNA_species(object):
             else:
                 self.logger.warn("%s has already been created, it will be used" %(ReadFastaFilename) )
 
-    def launch_Trinity(self, Threads, Memory, long_read=False):
+    def launch_Trinity(self, Threads, Memory, long_read=False, cds=False):
         start = time.time()
         self.logger.info("Launch Trinity")
         ExitCode = 0
@@ -520,6 +521,18 @@ class RNA_species(object):
 
         self.add_time_statistic("Trinity", start = start)
         self.logger.info("End Trinity (%s seconds)" %(self.get_time_statistic("Trinity")))
+        
+        if cds:
+            Species.keep_only_cds()
+    
+    def keep_only_cds(self):
+        start = time.time()
+        ##
+        TransdecoderProcess = Transdecoder.Transdecoder(self.TrinityFastaFilename,
+                                             min_length = 150)
+        TransdecoderProcess.run()
+        self.add_time_statistic("Transdecoder", start = start)
+        self.logger.info("End Transdecoder (%s seconds)" %(self.get_time_statistic("Transdecoder")))
 
     def get_homology_between_trinity_results_and_references(self,Query, method="blastn"):
         if method == "exonerate":

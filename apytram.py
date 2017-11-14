@@ -164,6 +164,9 @@ OutOptions.add_argument('--no_best_file', action='store_true',
 OutOptions.add_argument('--only_best_file', action='store_true',
                         default=False,
                         help="By default, a fasta file (Outprefix.fasta) containing all sequences from the last iteration is created. If this option is used, it will NOT be created.")
+OutOptions.add_argument('--cds', action='store_true',
+                        default=False,
+                        help="Keep only CDS in output sequences using Transdecoder. (default: False)")
 
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
@@ -870,7 +873,7 @@ for Query in QueriesList:
                     Species.get_read_sequences(Threads, Memory, meth="blastdbcmd")
 
                 ### Launch Trinity
-                Species.launch_Trinity(Threads, Memory, long_read=True)
+                Species.launch_Trinity(Threads, Memory, long_read=True, cds=args.cds)
 
                 if not os.path.isfile(Species.TrinityFastaFilename): # Trinity found nothing
                     Species.Improvment = False
