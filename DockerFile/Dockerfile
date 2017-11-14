@@ -1,4 +1,4 @@
-FROM debian:jessie-slim
+FROM debian:stretch-slim
 MAINTAINER Carine Rey carine.rey@ens-lyon.org
 
 RUN apt-get update
@@ -24,7 +24,9 @@ RUN apt-get install --no-install-recommends  -qy git \
                         unzip \
 # to user
                         vim \
-                        htop
+                        htop \
+                        xvfb \
+                        gosu
 
 
 ### install openjdk-8-jre
@@ -79,5 +81,12 @@ ENV PATH /opt/TransDecoder-"$transdecoder_version"/:$PATH
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
 
-### 
+##### install entrypoint
+ADD entrypoint.sh /usr/local/bin/entrypoint.sh
+
+##### build a working directory
 WORKDIR /data
+
+CMD ["apytram.py", "-h"]
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint.sh"]
+
