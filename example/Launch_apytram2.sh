@@ -16,7 +16,7 @@ START=$(date +%s)
 mkdir -p $WORKING_DIR
 cd $WORKING_DIR
 
-$APYTRAM -d $WORKING_DIR/db/souris:MM,$WORKING_DIR/db/hamster:HM -dt paired:MM,paired:HM -out $OUTPUT_DIR/apytram -fq $DATA_DIR/rna_seq/fastq/Mesocricetus_auratus.datatest2.fq:HM,$DATA_DIR/rna_seq/fastq/Mus_musculus.datatest2.fq:MM -q $DATA_DIR/query/reference.nogap.fa:HH_Mus --out_by_species  -log apytram.log
+$APYTRAM -d $WORKING_DIR/db/souris:MM,$WORKING_DIR/db/hamster:HM -dt paired:MM,paired:HM -out $OUTPUT_DIR/apytram -fq $DATA_DIR/rna_seq/fastq/Mesocricetus_auratus.datatest2.fq:HM,$DATA_DIR/rna_seq/fastq/Mus_musculus.datatest2.fq:MM -q $DATA_DIR/query/reference.nogap.fa:HH_Mus --out_by_species  -log apytram.log -tmp $WORKING_DIR/apytram_tmp --keep_tmp --cds
 
 
 files="$OUTPUT_DIR/apytram.HH_Mus.best.fasta
