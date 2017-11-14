@@ -164,6 +164,9 @@ OutOptions.add_argument('--no_best_file', action='store_true',
 OutOptions.add_argument('--only_best_file', action='store_true',
                         default=False,
                         help="By default, a fasta file (Outprefix.fasta) containing all sequences from the last iteration is created. If this option is used, it will NOT be created.")
+OutOptions.add_argument('--cds', action='store_true',
+                        default=False,
+                        help="Keep only CDS in output sequences using Transdecoder. (default: False)")
 
 OutOptions.add_argument('--stats', action='store_true',
                              help='Create files with statistics on each iteration. (default: False)')
@@ -229,10 +232,6 @@ MiscellaneousOptions.add_argument('-threads', type=positive_integer,
 MiscellaneousOptions.add_argument('-memory', type=positive_integer,
                     help="Memory available for the assembly in Giga. (Default 1)",
                     default=1)
-
-MiscellaneousOptions.add_argument('--UseMapper', action='store_true',
-                    help="Use NextGenMapper instead of balstn to fish reads (in dev)",
-                    default=False)
 MiscellaneousOptions.add_argument('--UseIndex', action='store_true',
                     help="Use index_db from BioPython to retrieve reads",
                     default=False)
@@ -312,12 +311,6 @@ else:
 # Define global parameters
 StartIteration = args.iteration_start
 MaxIteration = args.iteration_max
-
-UseMapper = args.UseMapper
-
-if UseMapper and (not ApytramLib.ApytramNeeds.search("ngm")):
-        logger.error("ngm not in the PATH !")
-        ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
 
 UseIndex = args.UseIndex
 
@@ -672,9 +665,7 @@ FreeSpaceTmpDir = ApytramLib.ApytramNeeds.get_free_space(TmpDirName)
 logger.debug("%s free space in %s", FreeSpaceTmpDir, TmpDirName)
 
 
-if UseMapper or UseIndex:
-    if UseMapper:
-        logger.warn("Use NextGenMapper instead of Blastn to fish reads.")
+if UseIndex:
     if UseIndex:
         logger.warn("Use index files instead of Blastdbcmd to retrieve reads.")
     logger.warn("Require raw reads for each species.")
@@ -694,8 +685,8 @@ for Species in SpeciesList:
         Species.prepare_database(FreeSpaceTmpDir, TmpDirName)
         Species.build_database(FreeSpaceTmpDir, TmpDirName)
 
-    ### If Use mapper, apytram needs raw reads
-    if UseMapper or (UseIndex and not os.path.isfile(Species.IndexFilename)):
+    ### If Use Index and it not exists, apytram needs raw reads
+    if UseIndex and not os.path.isfile(Species.IndexFilename):
         if Species.InputFastaFilename:
             logger.warn("\t\tRaw reads available (%s)", Species.InputFastaFilename)
             pass
@@ -811,7 +802,7 @@ for Query in QueriesList:
                 ### Blast bait sequences on database of reads
                 # Write read names in ReadNamesFile if the file does not exist
                 if not os.path.isfile(Species.ReadNamesFilename):
-                    Species.fish_reads(Query.BaitSequences, Threads, mapper=UseMapper)
+                    Species.fish_reads(Query.BaitSequences, Threads)
                 else:
                     logger.warn("%s has already been created, it will be used", Species.ReadNamesFilename)
 
@@ -855,10 +846,16 @@ for Query in QueriesList:
             if Species.Improvment:
                 # Compare the read list names with the list of the previous iteration:
                 NbNewReads = ApytramLib.ApytramNeeds.number_new_reads(Species.PreviousReadNamesFilename, Species.ParsedReadNamesFilename, nb_intial=Species.ReadsNumber)
+                OldNumberReads = ApytramLib.ApytramNeeds.count_lines(Species.PreviousReadNamesFilename)
                 logger.warning("Iteration: %s - Species: %s - Number of new reads: %s", Species.CurrentIteration, Species.Species, NbNewReads)
 
                 if (NbNewReads == 0) and not FinishAllIter:
                     logger.info("Reads from the current iteration are identical to reads from the previous iteration")
+                    Species.Improvment = False
+                    Species.CompletedIteration = False
+
+                if OldNumberReads !=0 and NbNewReads > 20000 and NbNewReads > 5 * OldNumberReads:
+                    logger.info("Number of reads has soared -> stop iteration")
                     Species.Improvment = False
                     Species.CompletedIteration = False
 
@@ -876,7 +873,7 @@ for Query in QueriesList:
                     Species.get_read_sequences(Threads, Memory, meth="blastdbcmd")
 
                 ### Launch Trinity
-                Species.launch_Trinity(Threads, Memory)
+                Species.launch_Trinity(Threads, Memory, long_read=True, cds=args.cds)
 
                 if not os.path.isfile(Species.TrinityFastaFilename): # Trinity found nothing
                     Species.Improvment = False

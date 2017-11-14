@@ -237,6 +237,15 @@ class Fasta(object):
         write_in_file(str(self), OutFastaFile)
 
 
+    def get(self, sequence_name):
+        i = 0
+        while i in range(len(self.Names)):
+            if self.Names[i] == sequence_name:
+                return self.Sequences[i].Sequence
+            i+=1
+        return ""
+
+
 def search(program):
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
@@ -316,6 +325,45 @@ def write_in_file(String,Filename,mode = "w"):
     if mode in ["w","a"]:
         with open(Filename,mode) as File:
             File.write(String)
+
+
+
+
+def read_clstr(File):
+    res = {}
+    if os.path.isfile(File):
+        File = open(File,"r")
+        Fasta = File.read().strip().split("\n")
+        File.close()
+    else:
+        return res
+
+    name = ""
+    sequence = ""
+    sequence_list = []
+
+    for line in Fasta + [">Cluster"]:
+        if re.match(">Cluster",line):
+            # This is a new clustr write the previous sequence if it exists
+            if sequence_list:
+                res[name] = sequence_list
+                sequence_list = []
+
+            name = line[1:].replace("Cluster ","Cluster_") # remove the >
+
+        elif name != "":
+            seq = line.split(">")[1].split("...")[0]
+            rep = line.split(" ")[-1] == "*"
+            if not rep:
+                rev = line.split(" ")[-1].split("/")[0] == "-"
+            else:
+                rev = False
+            sequence_list.append((seq, rep, rev))
+        else:
+            pass
+    return res
+
+
 
 def add_paired_read_names(File, NewFile, logger = ""):
     "Add paired read names to a read name list"

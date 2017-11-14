@@ -45,13 +45,17 @@ def get_version():
     (out, err) = p.communicate()
     if not err:
         version = out.split("\n")[0]
+        try:
+            version = map(int,version.split("v")[-1].split("."))
+        except:
+            version = [0]
     else:
-        version = ""
+        version = [0]
     return(version)
 
 class Trinity(object):
     """Define an object to launch Trinity"""
-    def __init__(self, OutputFile, single="", left="", right=""):
+    def __init__(self, OutputFile, single="", left="", right="", longreads=""):
         self.logger = logging.getLogger('apytram.lib.Trinity')
         self.seqType = "fa"
         self.max_memory = 1
@@ -60,6 +64,7 @@ class Trinity(object):
         self.OutputFile = OutputFile
         self.RightInputFile = right
         self.LeftInputFile = left
+        self.LongReads = longreads
         self.MinLength = 200
         self.RunAsPaired = False
         self.FullCleanup = False
@@ -89,6 +94,9 @@ class Trinity(object):
         if self.LeftInputFile:
             command.extend(["--left", self.LeftInputFile])
 
+        if self.LongReads:
+            command.extend(["--long_reads", self.LongReads])
+
         if self.RunAsPaired:
             command.append("--run_as_paired")
 
@@ -97,11 +105,12 @@ class Trinity(object):
 
         if self.NoNormalizeReads:
             Trinity_version = get_version()
-            if re.search( "v2.3", Trinity_version):
+            if Trinity_version[0] > 2 :
+                command.append("--no_normalize_reads")
+            elif Trinity_version[0] == 2 and Trinity_version[1] >= 3:
                 command.append("--no_normalize_reads")
             else:
-                self.logger.warning("No last version of Trinity")
-
+                self.logger.warning("This version of Trinity has not the option --no_normalize_reads")
 
         if self.SS_lib_type in ["FR", "RF", "F", "R"]:
             command.extend(["--SS_lib_type", self.SS_lib_type])
@@ -116,6 +125,8 @@ class Trinity(object):
         if err:
             self.logger.error(
                  "Unexpected error when we launch Trinity:\n")
+            self.logger.error(
+                 " ".join(command))
             self.logger.debug(
                  "[...]\n"+"\n".join(out.strip().split("\n")[-20:]))
             self.logger.error(err)
