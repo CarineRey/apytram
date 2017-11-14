@@ -39,32 +39,36 @@ import re
 
 class TransDecoder(object):
     """Define an object to launch TransDecoder"""
-    def __init__(self, FastaFile, min_prot_length=None, cpu=1, single_best_orf=True):
+    def __init__(self, FastaFile, min_prot_length=None, cpu=1, single_best_orf=True, TmpDir=None):
         self.logger = logging.getLogger('apytram.lib.TransDecoder')
         self.fasta = FastaFile
         self.min_prot_length = min_prot_length
+        self.retain_long_orfs = min_prot_length
         self.single_best_orf = single_best_orf
         self.cpu = cpu
+        self.TmpDir = TmpDir
 
     def launch(self):
-        command1 = ["TransDecoder.LongOrfs", "-t", FastaFile]
-        command2 = ["TransDecoder.LongOrfs", "-t", FastaFile]
+        command1 = ["TransDecoder.LongOrfs", "-t", self.fasta]
+        command2 = ["TransDecoder.Predict", "-t", self.fasta]
 
         if self.min_prot_length:
-            command1.extend(["-m", self.min_prot_length/3 - 1])
-        if self.retain_long_orfs:
-            command2.extend(["--retain_long_orfs", self.min_prot_length])
-        if self.retain_long_orfs:
-            command2.extend(["--retain_long_orfs", self.min_prot_length])
+            command1.extend(["-m", str(int(self.min_prot_length/3 - 1))])
+        if self.min_prot_length:
+            command2.extend(["--retain_long_orfs", str(int(self.min_prot_length))])
+        if self.single_best_orf:
+            command2.append("--single_best_orf")
 
         self.logger.debug(" ".join(command1))
         p1 = subprocess.Popen(command1,
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+                             stderr=subprocess.PIPE,
+                             cwd=self.TmpDir)
         (out1, err1) = p1.communicate()
         returncode1 = p1.poll()
-        
-        if err1:
+
+        returncode2 = 1
+        if returncode1:
             self.logger.error(
                  "Unexpected error when we launch TransDecoder.LongOrfs:\n")
             self.logger.error(
@@ -72,20 +76,22 @@ class TransDecoder(object):
             self.logger.debug(
                  "[...]\n"+"\n".join(out1.strip().split("\n")[-20:]))
             self.logger.error(err1)
-            
-        p2 = subprocess.Popen(command2,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        (out, err) = p2.communicate()
-        returncode2 = p2.poll()
 
-        if err2:
-            self.logger.error(
-                 "Unexpected error when we launch TransDecoder.Predicts:\n")
-            self.logger.error(
-                 " ".join(command2))
-            self.logger.debug(
-                 "[...]\n"+"\n".join(out2.strip().split("\n")[-20:]))
-            self.logger.error(err2)
+        else:
+            p2 = subprocess.Popen(command2,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                cwd=self.TmpDir)
+            (out2, err2) = p2.communicate()
+            returncode2 = p2.poll()
 
-        return (out2, err2, returncode2)
+            if returncode2:
+                self.logger.error(
+                    "Unexpected error when we launch TransDecoder.Predicts:\n")
+                self.logger.error(
+                    " ".join(command2))
+                self.logger.debug(
+                    "[...]\n"+"\n".join(out2.strip().split("\n")[-20:]))
+                self.logger.error(err2)
+
+        return (returncode1+returncode2)
