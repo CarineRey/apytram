@@ -19,6 +19,12 @@ RUN apt-get install --no-install-recommends  -qy git \
                         rsync \
 #To install Transdecoder
                         libany-uri-escape-perl \
+#To install R
+#                        r-base \
+#                        curl \
+#                        libcairo2-dev \
+#                        libssl-dev \
+#                        libcurl4-openssl-dev \
 # to install bowtie2
                         libtbb-dev \
                         unzip \
@@ -34,17 +40,19 @@ RUN echo "deb http://httpredir.debian.org/debian jessie-backports main" >> /etc/
     apt-get update && apt-get install --no-install-recommends -t jessie-backports -qy ca-certificates-java openjdk-8-jre-headless 
 
 
-###  install bowtie 2.3.2
+###  install bowtie2 2.3.3.1
+ENV bowtie_version 2.3.3.1
 WORKDIR /opt
-RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-source.zip &&\
-    unzip bowtie2-2.3.2-source.zip && cd bowtie2-2.3.2/ && make && make install
+RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/"$bowtie_version"/bowtie2-"$bowtie_version"-source.zip &&\
+    unzip bowtie2-"$bowtie_version"-source.zip && cd bowtie2-"$bowtie_version"/ && make && make install
 
 
 ###  install ncbi-blast+=2.6.0
+ENV blast_version 2.6.0
 WORKDIR /opt
-RUN wget ftp://ftp.ncbi.nih.gov/blast/executables/blast+/2.6.0/ncbi-blast-2.6.0+-x64-linux.tar.gz &&\
-    tar zxf ncbi-blast-2.6.0+-x64-linux.tar.gz
-ENV PATH /opt/ncbi-blast-2.6.0+/bin/:$PATH
+RUN wget ftp://ftp.ncbi.nih.gov/blast/executables/blast+/"$blast_version"/ncbi-blast-"$blast_version"+-x64-linux.tar.gz &&\
+    tar zxf ncbi-blast-"$blast_version"+-x64-linux.tar.gz
+ENV PATH /opt/ncbi-blast-"$blast_version"+/bin/:$PATH
 
 
 ### install Trinity
@@ -70,16 +78,25 @@ ENV PATH /opt/cdhit/cd-hit-auxtools:$PATH
 
 
 #### install TransDecoder
-ENV transdecoder_version TransDecoder-v5.0.2
+ENV transdecoder_version 3.0.1
 WORKDIR /opt
-RUN wget https://github.com/TransDecoder/TransDecoder/archive/"$transdecoder_version".zip &&\
-    unzip "$transdecoder_version".zip  && rm "$transdecoder_version".zip && \
+RUN wget https://github.com/TransDecoder/TransDecoder/archive/v"$transdecoder_version".zip &&\
+    unzip v"$transdecoder_version".zip  && rm v"$transdecoder_version".zip && \
     ls /opt/ && cd /opt/TransDecoder-"$transdecoder_version"/ && make && ls /opt
 ENV PATH /opt/TransDecoder-"$transdecoder_version"/:$PATH
+
+## install R and ggplot2 for TransDecoder
+#RUN echo 'install.packages(c("ggplot2"), repos="http://cran.us.r-project.org", dependencies=TRUE); \
+#    source("https://bioconductor.org/biocLite.R");\
+#    biocLite("seqLogo")' > /tmp/install.R && Rscript /tmp/install.R && rm /tmp/install.R
 
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
+
+# DEV apytram
+WORKDIR /opt/apytram
+RUN git fetch origin && git checkout dev
 
 ##### install entrypoint
 ADD entrypoint.sh /usr/local/bin/entrypoint.sh
