@@ -16,6 +16,9 @@ RUN apt-get install --no-install-recommends  -qy git \
 # to install trinity
                         zlib1g-dev \
                         ncurses-dev \
+                        rsync \
+#To install Transdecoder
+                        libany-uri-escape-perl \
 # to install bowtie2
                         libtbb-dev \
                         unzip \
@@ -62,6 +65,15 @@ RUN git clone https://github.com/weizhongli/cdhit.git /opt/cdhit/
 RUN cd /opt/cdhit/cd-hit-auxtools &&  make && \
     cd /opt/cdhit &&  make  && make install
 ENV PATH /opt/cdhit/cd-hit-auxtools:$PATH
+
+
+#### install TransDecoder
+ENV transdecoder_version TransDecoder-v5.0.2
+WORKDIR /opt
+RUN wget https://github.com/TransDecoder/TransDecoder/archive/"$transdecoder_version".zip &&\
+    unzip "$transdecoder_version".zip  && rm "$transdecoder_version".zip && \
+    ls /opt/ && cd /opt/TransDecoder-"$transdecoder_version"/ && make && ls /opt
+ENV PATH /opt/TransDecoder-"$transdecoder_version"/:$PATH
 
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram

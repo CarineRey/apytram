@@ -98,6 +98,15 @@ class TestConfigApytram(unittest.TestCase):
             #print Search
             self.assertIsNotNone(Search)
 
+    #Check Transdecoder
+    def test_Transdecoder(self):
+            #print "\nSearch for Transdecoder"
+            Search1 = search("TransDecoder.LongOrfs")
+            Search2 = search("TransDecoder.Predict")
+            #print Search
+            self.assertIsNotNone(Search1)
+            self.assertIsNotNone(Search2)
+
     def test_version_Trinity(self):
             if search("Trinity"):
                 Trinity_version = ApytramLib.Trinity.get_version()
