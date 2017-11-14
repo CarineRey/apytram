@@ -121,11 +121,18 @@ class TestConfigApytram(unittest.TestCase):
 
     #Check samtools:
     def test_samtools(self):
-        #print "\nSearch for samtools"
         Search = search("samtools")
-        #print Search
-        #if Search:
-        #   print "        !! Check samtools version = 0.1.19"
+        if Search:
+            pass
+        elif search("Trinity"):
+            Trinity_version = ApytramLib.Trinity.get_version()
+            if Trinity_version[0] < 2:
+                pass
+            elif (Trinity_version[0] == 2 & Trinity_version[1] <= 2):
+                pass
+            else:
+                print("\tSamtools not needed")
+                Search = "ok"
         self.assertIsNotNone(Search)
 
     #Check Bowtie2:
