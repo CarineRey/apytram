@@ -737,7 +737,7 @@ for Species in SpeciesList:
             Species.ClstrIndexDB.close()
             for clstr_file in Species.ClstrIndexDB._filenames:
                if not os.path.isfile(clstr_file):
-                   logger.error("%s  is not a file. (clstr file associeted with the index %s)", clstr_file)
+                   logger.error("%s  is not a file. (clstr file associated with the index %s)", clstr_file, Species.ClstrIndexFilename)
                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
         else:
            if not Species.ClstrIndexFilename:
