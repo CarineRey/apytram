@@ -10,4 +10,7 @@ clean_test:
 clean_test2:
 	cd example && rm -r working2_dir/ output2_dir/
 
-.PHONY: test clean_test test2 clean_test2
+build_apytram_docker:
+	cd Dockerfile && ./build_apytram_docker.sh
+
+.PHONY: test clean_test test2 clean_test2 build_apytram_docker

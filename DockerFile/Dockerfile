@@ -9,10 +9,13 @@ RUN apt-get install --no-install-recommends  -qy git \
                         build-essential \
                         mafft \
                         exonerate \
-                        python-numpy \
-                        python-pandas \
-                        python-matplotlib \
-                        python-biopython \
+                        python-pip \
+                        python-dev \
+                        python-setuptools \
+#                       python-numpy \
+#                       python-pandas \
+#                       python-matplotlib \
+#                       python-biopython \
 # to install trinity
                         zlib1g-dev \
                         ncurses-dev \
@@ -32,12 +35,17 @@ RUN apt-get install --no-install-recommends  -qy git \
                         vim \
                         htop \
                         xvfb \
-                        gosu
+                        gosu 
 
+
+RUN pip install numpy
+RUN pip install pandas
+RUN pip install matplotlib
+RUN pip install biopython
 
 ### install openjdk-8-jre
-RUN echo "deb http://httpredir.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && mkdir /usr/share/man/man1 && \
-    apt-get update && apt-get install --no-install-recommends -t jessie-backports -qy ca-certificates-java openjdk-8-jre-headless 
+RUN echo "deb http://httpredir.debian.org/debian stretch-backports main" >> /etc/apt/sources.list && mkdir /usr/share/man/man1 && \
+    apt-get update && apt-get install --no-install-recommends -t stretch-backports -qy ca-certificates-java openjdk-8-jre-headless 
 
 
 ###  install bowtie2 2.3.3.1
@@ -93,6 +101,7 @@ ENV PATH /opt/TransDecoder-"$transdecoder_version"/:$PATH
 ### install apytram
 RUN git clone https://github.com/carinerey/apytram /opt/apytram
 ENV PATH /opt/apytram:$PATH
+RUN cd /opt/apytram && make test
 
 ##### install entrypoint
 ADD entrypoint.sh /usr/local/bin/entrypoint.sh
