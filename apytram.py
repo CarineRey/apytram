@@ -713,7 +713,7 @@ for Species in SpeciesList:
            Species.IndexDB.close()
            for fasta_file in Species.IndexDB._filenames:
                if not os.path.isfile(fasta_file):
-                   logger.error("%s  is not a file. (fasta file associeted with the index %s)", fasta_file)
+                   logger.error("%s  is not a file. (fasta file associeted with the index %s)", fasta_file, Species.IndexFilename)
                    ApytramLib.ApytramNeeds.end(1, TmpDirName, keep_tmp=args.keep_tmp)
         else:
            start_index = time.time()
