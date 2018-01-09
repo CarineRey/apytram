@@ -973,7 +973,7 @@ class Query(object):
             ApytramNeeds.cat_fasta(" ".join(SpeciesCurrentReconstructedSequencesFileList), self.BaitSequences)
 
         # Simplify baitsequences
-        if ApytramNeeds.count_sequences(self.BaitSequences) > 300:
+        if False and ApytramNeeds.count_sequences(self.BaitSequences) > 300: #In dev, no gain if long sequences due to mafft alignment.
             self.reduce_complexity_baitSequences()
 
 
@@ -1153,7 +1153,7 @@ class Query(object):
         print self.BaitSequences
         print "#####"
         print "Reduce complexity:" + str(time.time() - start)
-        self.logger.info("reduce complexity all--- %s seconds ---" %(time.time() - start))
+        self.logger.info("reduce complexity all --- %s seconds ---" %(time.time() - start))
 
     def measure_final_coverage(self):
         if not self.Aligned:
