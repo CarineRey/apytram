@@ -530,7 +530,7 @@ class RNA_species(object):
         start = time.time()
         ##
         TransdecoderProcess = Transdecoder.TransDecoder(self.TrinityFastaFilename,
-                                             min_prot_length=150, TmpDir=self.TmpDirName)
+                                             min_prot_length=120, TmpDir=self.TmpDirName)
         returncode = TransdecoderProcess.launch()
         if not returncode:
             self.TrinityFastaFilename = self.TrinityFastaFilename + ".transdecoder.cds"

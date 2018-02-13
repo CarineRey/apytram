@@ -39,7 +39,7 @@ import re
 
 class TransDecoder(object):
     """Define an object to launch TransDecoder"""
-    def __init__(self, FastaFile, min_prot_length=None, cpu=1, single_best_orf=True, TmpDir=None):
+    def __init__(self, FastaFile, min_prot_length=None, cpu=1, single_best_orf=False, TmpDir=None):
         self.logger = logging.getLogger('apytram.lib.TransDecoder')
         self.fasta = FastaFile
         self.min_prot_length = min_prot_length
