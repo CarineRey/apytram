@@ -530,7 +530,7 @@ class RNA_species(object):
         start = time.time()
         ##
         TransdecoderProcess = Transdecoder.TransDecoder(self.TrinityFastaFilename,
-                                             min_prot_length=150, TmpDir=self.TmpDirName)
+                                             min_prot_length=120, TmpDir=self.TmpDirName)
         returncode = TransdecoderProcess.launch()
         if not returncode:
             self.TrinityFastaFilename = self.TrinityFastaFilename + ".transdecoder.cds"
@@ -706,7 +706,7 @@ class RNA_species(object):
             OldName = Sequence.Name
             if Sequence.BestSequence:
                 Message += "Best_"
-            NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
+            NewName = "APYTRAM_%s%d len=%d [%s id=%d len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
             NewnameDict[OldName] = NewName
 
         self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)

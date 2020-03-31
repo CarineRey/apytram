@@ -107,6 +107,17 @@ class TestConfigApytram(unittest.TestCase):
             self.assertIsNotNone(Search1)
             self.assertIsNotNone(Search2)
 
+    def test_version_Transdecoder(self):
+            if search("TransDecoder.LongOrfs"):
+                TransDecoder_version = ApytramLib.Transdecoder.get_version()
+                if TransDecoder_version[0] >= 5:
+                    v = True
+                    print "\tTransdecoder version must be >= v5.5.0 (current v%s)" %(".".join(map(str,TransDecoder_version)))
+                else:
+                    v = False
+
+                self.assertTrue(v)
+
     def test_version_Trinity(self):
             if search("Trinity"):
                 Trinity_version = ApytramLib.Trinity.get_version()
@@ -118,6 +129,16 @@ class TestConfigApytram(unittest.TestCase):
                     v = False
                     
                 self.assertTrue(v)
+
+    #Check jellyfish:
+    def test_jellyfish(self):
+            Search = search("jellyfish")
+            self.assertIsNotNone(Search)
+
+    #Check Salmon:
+    def test_salmon(self):
+            Search = search("salmon")
+            self.assertIsNotNone(Search)
 
     #Check samtools:
     def test_samtools(self):
