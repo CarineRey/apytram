@@ -706,7 +706,7 @@ class RNA_species(object):
             OldName = Sequence.Name
             if Sequence.BestSequence:
                 Message += "Best_"
-            NewName = "APYTRAM_%s%d.len=%d.[%s.id=%d.len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
+            NewName = "APYTRAM_%s%d len=%d [%s id=%d len=%d]" %(Message,i,Sequence.ql,Sequence.ti,Sequence.pi,Sequence.tl)
             NewnameDict[OldName] = NewName
 
         self.FilteredTrinityFasta = self.FilteredTrinityFasta.rename_fasta(NewnameDict)
