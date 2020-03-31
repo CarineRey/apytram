@@ -37,6 +37,22 @@ import logging
 import subprocess
 import re
 
+def get_version():
+    command = ["TransDecoder.LongOrfs", "--version"]
+    p = subprocess.Popen(command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+    (out, err) = p.communicate()
+    if not err:
+        version = out.split(" ")[1]
+        try:
+            version = map(int,version.split("."))
+        except:
+            version = [0]
+    else:
+        version = [0]
+    return(version)
+
 class TransDecoder(object):
     """Define an object to launch TransDecoder"""
     def __init__(self, FastaFile, min_prot_length=None, cpu=1, single_best_orf=False, TmpDir=None):
@@ -52,10 +68,12 @@ class TransDecoder(object):
         command1 = ["TransDecoder.LongOrfs", "-t", self.fasta]
         command2 = ["TransDecoder.Predict", "-t", self.fasta]
 
+        command2.extend(["--no_refine_starts"])
         if self.min_prot_length:
             command1.extend(["-m", str(int(self.min_prot_length/3 - 1))])
         if self.min_prot_length:
-            command2.extend(["--retain_long_orfs", str(int(self.min_prot_length))])
+            command2.extend(["--retain_long_orfs_mode", str("strict")])
+            command2.extend(["--retain_long_orfs_length", str(int(self.min_prot_length))])
         if self.single_best_orf:
             command2.append("--single_best_orf")
 
